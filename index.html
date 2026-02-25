@@ -5,35 +5,11 @@
 <title>Futsal Tactics Pro</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-body{
-  margin:0;
-  font-family:Arial;
-  background:#1e1e1e;
-  overflow:hidden;
-  color:white;
-}
-header{
-  background:linear-gradient(90deg,#4e73df,#6f42c1);
-  padding:10px 20px;
-}
-.toolbar{
-  padding:8px;
-  background:#2b2b2b;
-  display:flex;
-  flex-wrap:wrap;
-  gap:6px;
-}
-button{
-  padding:6px 12px;
-  border:none;
-  border-radius:6px;
-  cursor:pointer;
-  font-weight:bold;
-}
-canvas{
-  display:block;
-  background:#1f7a1f;
-}
+body{margin:0;background:#111;font-family:Arial;overflow:hidden;color:white;}
+header{background:linear-gradient(90deg,#4e73df,#6f42c1);padding:8px 15px;}
+.toolbar{background:#2b2b2b;padding:6px;display:flex;flex-wrap:wrap;gap:5px;}
+button{padding:5px 10px;border:none;border-radius:5px;font-weight:bold;cursor:pointer;}
+canvas{display:block;background:#197a1f;}
 </style>
 </head>
 <body>
@@ -41,16 +17,17 @@ canvas{
 <header>⚽ Futsal Tactics Pro</header>
 
 <div class="toolbar">
-  <button onclick="mode='select'">Seleccionar</button>
-  <button onclick="mode='arrow'">Flecha</button>
-  <button onclick="addPlayer('jugador')">+ Jugador</button>
-  <button onclick="addPlayer('arquero')">+ Arquero</button>
-  <button onclick="addCone()">+ Cono</button>
-  <button onclick="addBall()">+ Pelota</button>
-  <button onclick="animatePlay()">▶ Animar</button>
-  <button onclick="deleteSelectedArrow()">Borrar flecha seleccionada</button>
-  <button onclick="savePlay()">Guardar</button>
-  <button onclick="loadPlay()">Cargar</button>
+<button onclick="mode='select'">Seleccionar</button>
+<button onclick="mode='arrow'">Flecha</button>
+<button onclick="addPlayer('jugador')">+ Jugador</button>
+<button onclick="addPlayer('arquero')">+ Arquero</button>
+<button onclick="addCone()">+ Cono</button>
+<button onclick="addBall()">+ Pelota</button>
+<button onclick="toggleTactic()">Modo Ofensivo/Defensivo</button>
+<button onclick="animatePlay()">▶ Animar</button>
+<button onclick="deleteSelectedArrow()">Borrar flecha</button>
+<button onclick="savePlay()">Guardar</button>
+<button onclick="loadPlay()">Cargar</button>
 </div>
 
 <canvas id="board"></canvas>
@@ -60,279 +37,283 @@ const canvas=document.getElementById("board");
 const ctx=canvas.getContext("2d");
 
 function resize(){
-  canvas.width=window.innerWidth;
-  canvas.height=window.innerHeight-90;
-  render();
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight-80;
+render();
 }
 window.addEventListener("resize",resize);
 resize();
 
 let mode="select";
-let players=[];
-let arrows=[];
-let cones=[];
-let balls=[];
-let selectedArrow=null;
+let players=[], arrows=[], cones=[], balls=[];
 let dragging=null;
-let arrowFromPlayer=null;
+let selectedArrow=null;
+let arrowFrom=null;
 let arrowStart=null;
 let scale=1;
+let tacticMode="ofensivo";
 
-// ===== FIELD =====
+/* ================= FIELD ================= */
 function drawField(){
-  const W=900;
-  const H=550;
-  const areaR=100;
-  const goalH=160;
+const W=1000;
+const H=600;
+const areaR=110;
+const goalH=180;
 
-  ctx.fillStyle="#1f7a1f";
-  ctx.fillRect(-1500,-900,3000,1800);
+ctx.fillStyle="#197a1f";
+ctx.fillRect(-2000,-2000,4000,4000);
 
-  ctx.strokeStyle="white";
-  ctx.lineWidth=3;
+ctx.strokeStyle="white";
+ctx.lineWidth=4;
 
-  ctx.strokeRect(-W/2,-H/2,W,H);
+// borde cancha
+ctx.strokeRect(-W/2,-H/2,W,H);
 
-  ctx.beginPath();
-  ctx.moveTo(0,-H/2);
-  ctx.lineTo(0,H/2);
-  ctx.stroke();
+// linea central
+ctx.beginPath();
+ctx.moveTo(0,-H/2);
+ctx.lineTo(0,H/2);
+ctx.stroke();
 
-  ctx.beginPath();
-  ctx.arc(0,0,70,0,Math.PI*2);
-  ctx.stroke();
+// circulo central
+ctx.beginPath();
+ctx.arc(0,0,80,0,Math.PI*2);
+ctx.stroke();
 
-  ctx.font="20px Arial";
-  ctx.fillStyle="rgba(255,255,255,0.4)";
-  ctx.fillText("1",-W/4,-H/4);
-  ctx.fillText("2",W/4,-H/4);
-  ctx.fillText("3",-W/4,H/4);
-  ctx.fillText("4",W/4,H/4);
+// áreas
+ctx.beginPath();
+ctx.arc(-W/2,0,areaR,-Math.PI/2,Math.PI/2);
+ctx.stroke();
 
-  ctx.beginPath();
-  ctx.arc(-W/2,0,areaR,-Math.PI/2,Math.PI/2);
-  ctx.stroke();
+ctx.beginPath();
+ctx.arc(W/2,0,areaR,Math.PI/2,-Math.PI/2);
+ctx.stroke();
 
-  ctx.beginPath();
-  ctx.arc(W/2,0,areaR,Math.PI/2,-Math.PI/2);
-  ctx.stroke();
+// arcos
+ctx.strokeRect(-W/2-15,-goalH/2,15,goalH);
+ctx.strokeRect(W/2,-goalH/2,15,goalH);
 
-  ctx.strokeRect(-W/2-10,-goalH/2,10,goalH);
-  ctx.strokeRect(W/2,-goalH/2,10,goalH);
+// números tácticos
+ctx.font="30px Arial";
+ctx.fillStyle="rgba(255,255,255,0.35)";
+ctx.fillText("1",-W/4,-H/4);
+ctx.fillText("2",W/4,-H/4);
+ctx.fillText("3",-W/4,H/4);
+ctx.fillText("4",W/4,H/4);
 }
 
-// ===== PLAYERS =====
+/* ================= PLAYERS ================= */
 function drawPlayer(p){
-  ctx.save();
-  ctx.translate(p.x,p.y);
+ctx.save();
+ctx.translate(p.x,p.y);
 
-  const color=p.team==="A"?"#007bff":"#ff4d4d";
+const color=p.team==="A"?"#2196f3":"#ff4d4d";
 
-  ctx.beginPath();
-  ctx.arc(0,-18,6,0,Math.PI*2);
-  ctx.fillStyle="#f1c27d";
-  ctx.fill();
+ctx.beginPath();
+ctx.arc(0,-20,7,0,Math.PI*2);
+ctx.fillStyle="#f1c27d";
+ctx.fill();
 
-  ctx.strokeStyle=p.role==="arquero"?"#ffc107":color;
-  ctx.lineWidth=4;
+ctx.strokeStyle=p.role==="arquero"?"#ffc107":color;
+ctx.lineWidth=5;
 
-  ctx.beginPath();
-  ctx.moveTo(0,-12);
-  ctx.lineTo(0,10);
-  ctx.stroke();
+ctx.beginPath();
+ctx.moveTo(0,-13);
+ctx.lineTo(0,15);
+ctx.stroke();
 
-  ctx.beginPath();
-  ctx.moveTo(-8,0);
-  ctx.lineTo(8,0);
-  ctx.stroke();
+ctx.beginPath();
+ctx.moveTo(-10,0);
+ctx.lineTo(10,0);
+ctx.stroke();
 
-  ctx.beginPath();
-  ctx.moveTo(0,10);
-  ctx.lineTo(-6,22);
-  ctx.moveTo(0,10);
-  ctx.lineTo(6,22);
-  ctx.stroke();
+ctx.beginPath();
+ctx.moveTo(0,15);
+ctx.lineTo(-7,30);
+ctx.moveTo(0,15);
+ctx.lineTo(7,30);
+ctx.stroke();
 
-  ctx.fillStyle="white";
-  ctx.font="12px Arial";
-  ctx.textAlign="center";
-  ctx.fillText(p.name,0,36);
+ctx.fillStyle="white";
+ctx.font="13px Arial";
+ctx.textAlign="center";
+ctx.fillText(p.name,0,45);
 
-  ctx.restore();
+ctx.restore();
 }
 
-// ===== CONES =====
+/* ================= CONES ================= */
 function drawCones(){
-  cones.forEach(c=>{
-    ctx.fillStyle="orange";
-    ctx.beginPath();
-    ctx.moveTo(c.x,c.y);
-    ctx.lineTo(c.x-8,c.y+20);
-    ctx.lineTo(c.x+8,c.y+20);
-    ctx.closePath();
-    ctx.fill();
-  });
+cones.forEach(c=>{
+ctx.fillStyle="orange";
+ctx.beginPath();
+ctx.moveTo(c.x,c.y);
+ctx.lineTo(c.x-10,c.y+25);
+ctx.lineTo(c.x+10,c.y+25);
+ctx.closePath();
+ctx.fill();
+});
 }
 
-// ===== BALLS =====
+/* ================= BALLS ================= */
 function drawBalls(){
-  balls.forEach(b=>{
-    ctx.fillStyle="white";
-    ctx.beginPath();
-    ctx.arc(b.x,b.y,6,0,Math.PI*2);
-    ctx.fill();
-  });
+balls.forEach(b=>{
+ctx.fillStyle="white";
+ctx.beginPath();
+ctx.arc(b.x,b.y,8,0,Math.PI*2);
+ctx.fill();
+});
 }
 
-// ===== ARROWS =====
+/* ================= ARROWS ================= */
 function drawArrows(){
-  arrows.forEach(a=>{
-    ctx.strokeStyle=(a===selectedArrow)?"red":(a.team==="A"?"cyan":"yellow");
-    ctx.lineWidth=3;
+arrows.forEach(a=>{
+ctx.strokeStyle=(a===selectedArrow)?"red":(a.team==="A"?"cyan":"yellow");
+ctx.lineWidth=4;
+ctx.beginPath();
+ctx.moveTo(a.from.x,a.from.y);
+ctx.lineTo(a.to.x,a.to.y);
+ctx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(a.from.x,a.from.y);
-    ctx.lineTo(a.to.x,a.to.y);
-    ctx.stroke();
-
-    const ang=Math.atan2(a.to.y-a.from.y,a.to.x-a.from.x);
-    ctx.beginPath();
-    ctx.moveTo(a.to.x,a.to.y);
-    ctx.lineTo(a.to.x-12*Math.cos(ang-Math.PI/6),a.to.y-12*Math.sin(ang-Math.PI/6));
-    ctx.lineTo(a.to.x-12*Math.cos(ang+Math.PI/6),a.to.y-12*Math.sin(ang+Math.PI/6));
-    ctx.fillStyle=(a===selectedArrow)?"red":(a.team==="A"?"cyan":"yellow");
-    ctx.fill();
-  });
+const ang=Math.atan2(a.to.y-a.from.y,a.to.x-a.from.x);
+ctx.beginPath();
+ctx.moveTo(a.to.x,a.to.y);
+ctx.lineTo(a.to.x-15*Math.cos(ang-Math.PI/6),a.to.y-15*Math.sin(ang-Math.PI/6));
+ctx.lineTo(a.to.x-15*Math.cos(ang+Math.PI/6),a.to.y-15*Math.sin(ang+Math.PI/6));
+ctx.fillStyle=(a===selectedArrow)?"red":(a.team==="A"?"cyan":"yellow");
+ctx.fill();
+});
 }
 
+/* ================= RENDER ================= */
 function render(){
-  ctx.save();
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.translate(canvas.width/2,canvas.height/2);
-  ctx.scale(scale,scale);
+ctx.save();
+ctx.clearRect(0,0,canvas.width,canvas.height);
+ctx.translate(canvas.width/2,canvas.height/2);
+ctx.scale(scale,scale);
 
-  drawField();
-  drawArrows();
-  drawCones();
-  drawBalls();
-  players.forEach(drawPlayer);
+drawField();
+drawArrows();
+drawCones();
+drawBalls();
+players.forEach(drawPlayer);
 
-  ctx.restore();
+ctx.restore();
 }
 
-// ===== INTERACTION =====
+/* ================= INTERACTION ================= */
 canvas.addEventListener("mousedown",e=>{
-  const r=canvas.getBoundingClientRect();
-  const x=(e.clientX-r.left-canvas.width/2)/scale;
-  const y=(e.clientY-r.top-canvas.height/2)/scale;
+const r=canvas.getBoundingClientRect();
+const x=(e.clientX-r.left-canvas.width/2)/scale;
+const y=(e.clientY-r.top-canvas.height/2)/scale;
 
-  selectedArrow=arrows.find(a=>{
-    const d=Math.abs((a.to.y-a.from.y)*x-(a.to.x-a.from.x)*y+a.to.x*a.from.y-a.to.y*a.from.x)
-      /Math.hypot(a.to.y-a.from.y,a.to.x-a.from.x);
-    return d<10;
-  });
+// seleccionar flecha
+selectedArrow=arrows.find(a=>{
+const dx=a.to.x-a.from.x;
+const dy=a.to.y-a.from.y;
+const len=Math.hypot(dx,dy);
+const dist=Math.abs(dy*x-dx*y+a.to.x*a.from.y-a.to.y*a.from.x)/len;
+return dist<8;
+});
+if(selectedArrow){render();return;}
 
-  if(selectedArrow){ render(); return; }
+// arrastrar conos
+dragging=players.find(p=>Math.hypot(p.x-x,p.y-y)<25)
+|| cones.find(c=>Math.hypot(c.x-x,c.y-y)<20)
+|| balls.find(b=>Math.hypot(b.x-x,b.y-y)<20);
 
-  if(mode==="select"){
-    dragging=players.find(p=>Math.hypot(p.x-x,p.y-y)<20);
-  }
-
-  if(mode==="arrow"){
-    arrowFromPlayer=players.find(p=>Math.hypot(p.x-x,p.y-y)<20);
-    if(arrowFromPlayer){
-      arrowStart={x:arrowFromPlayer.x,y:arrowFromPlayer.y};
-    }
-  }
+if(mode==="arrow"){
+arrowFrom=players.find(p=>Math.hypot(p.x-x,p.y-y)<25);
+if(arrowFrom) arrowStart={x:arrowFrom.x,y:arrowFrom.y};
+}
 });
 
 canvas.addEventListener("mousemove",e=>{
-  if(dragging){
-    const r=canvas.getBoundingClientRect();
-    dragging.x=(e.clientX-r.left-canvas.width/2)/scale;
-    dragging.y=(e.clientY-r.top-canvas.height/2)/scale;
-    render();
-  }
+if(dragging){
+const r=canvas.getBoundingClientRect();
+dragging.x=(e.clientX-r.left-canvas.width/2)/scale;
+dragging.y=(e.clientY-r.top-canvas.height/2)/scale;
+render();
+}
 });
 
 canvas.addEventListener("mouseup",e=>{
-  dragging=null;
-
-  if(mode==="arrow" && arrowFromPlayer){
-    const r=canvas.getBoundingClientRect();
-    const x=(e.clientX-r.left-canvas.width/2)/scale;
-    const y=(e.clientY-r.top-canvas.height/2)/scale;
-
-    arrows.push({
-      playerId:arrowFromPlayer.id,
-      team:arrowFromPlayer.team,
-      from:{x:arrowStart.x,y:arrowStart.y},
-      to:{x,y}
-    });
-
-    arrowFromPlayer=null;
-    arrowStart=null;
-    render();
-  }
+dragging=null;
+if(mode==="arrow" && arrowFrom){
+const r=canvas.getBoundingClientRect();
+const x=(e.clientX-r.left-canvas.width/2)/scale;
+const y=(e.clientY-r.top-canvas.height/2)/scale;
+arrows.push({playerId:arrowFrom.id,team:arrowFrom.team,from:arrowStart,to:{x,y}});
+arrowFrom=null;
+render();
+}
 });
 
 canvas.addEventListener("wheel",e=>{
-  e.preventDefault();
-  scale+=e.deltaY*-0.001;
-  scale=Math.min(Math.max(scale,0.5),2);
-  render();
+e.preventDefault();
+scale+=e.deltaY*-0.001;
+scale=Math.min(Math.max(scale,0.5),2);
+render();
 });
 
-// ===== DELETE SELECTED ARROW =====
+/* ================= FUNCTIONS ================= */
 function deleteSelectedArrow(){
-  if(!selectedArrow) return;
-  arrows=arrows.filter(a=>a!==selectedArrow);
-  selectedArrow=null;
-  render();
-}
-
-// ===== STORAGE =====
-function savePlay(){
-  localStorage.setItem("futsalPro",JSON.stringify({players,arrows,cones,balls}));
-  alert("Guardado");
-}
-
-function loadPlay(){
-  const d=JSON.parse(localStorage.getItem("futsalPro"));
-  if(!d) return alert("No hay datos");
-  players=d.players;
-  arrows=d.arrows;
-  cones=d.cones;
-  balls=d.balls;
-  render();
+if(!selectedArrow) return;
+arrows=arrows.filter(a=>a!==selectedArrow);
+selectedArrow=null;
+render();
 }
 
 function animatePlay(){
-  arrows.forEach(a=>{
-    const p=players.find(pl=>pl.id===a.playerId);
-    if(!p) return;
-    let t=0;
-    function step(){
-      t+=0.02;
-      p.x=a.from.x+(a.to.x-a.from.x)*t;
-      p.y=a.from.y+(a.to.y-a.from.y)*t;
-      render();
-      if(t<1) requestAnimationFrame(step);
-    }
-    step();
-  });
+arrows.forEach(a=>{
+const p=players.find(pl=>pl.id===a.playerId);
+if(!p) return;
+let t=0;
+function step(){
+t+=0.02;
+p.x=a.from.x+(a.to.x-a.from.x)*t;
+p.y=a.from.y+(a.to.y-a.from.y)*t;
+render();
+if(t<1) requestAnimationFrame(step);
+}
+step();
+});
+}
+
+function toggleTactic(){
+tacticMode=tacticMode==="ofensivo"?"defensivo":"ofensivo";
+players.forEach(p=>{
+if(tacticMode==="defensivo") p.y+=80;
+else p.y-=80;
+});
+render();
+}
+
+function savePlay(){
+localStorage.setItem("futsalPro",JSON.stringify({players,arrows,cones,balls}));
+alert("Guardado");
+}
+
+function loadPlay(){
+const d=JSON.parse(localStorage.getItem("futsalPro"));
+if(!d) return;
+players=d.players;
+arrows=d.arrows;
+cones=d.cones;
+balls=d.balls;
+render();
 }
 
 function addPlayer(role){
-  const name=prompt("Nombre");
-  const team=prompt("Equipo A o B").toUpperCase();
-  if(!name||!["A","B"].includes(team)) return;
-  players.push({id:crypto.randomUUID(),x:0,y:0,name,role,team});
-  render();
+const name=prompt("Nombre");
+const team=prompt("Equipo A o B").toUpperCase();
+if(!name||!["A","B"].includes(team)) return;
+players.push({id:crypto.randomUUID(),x:0,y:0,name,role,team});
+render();
 }
 
-function addCone(){ cones.push({x:0,y:0}); render(); }
-function addBall(){ balls.push({x:0,y:0}); render(); }
+function addCone(){cones.push({x:0,y:0});render();}
+function addBall(){balls.push({x:0,y:0});render();}
 
 render();
 </script>
