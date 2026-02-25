@@ -59,12 +59,9 @@ canvas{
   <button onclick="setMode('ball',this)">⚽ Pelota</button>
   <button onclick="setMode('arrow',this)">➝ Flecha</button>
   <button onclick="deleteSelected()">🗑 Borrar</button>
-  <button onclick="toggleTactic()">🧠 Of/Def</button>
   <button onclick="animatePlay()">▶ Animar</button>
   <button onclick="saveState()">💾 Guardar</button>
   <button onclick="loadState()">📂 Cargar</button>
-  <button onclick="setTeam('A',this)">Equipo A</button>
-  <button onclick="setTeam('B',this)">Equipo B</button>
 </div>
 
 <canvas id="canvas"></canvas>
@@ -80,33 +77,21 @@ function resize(){
 resize();
 window.addEventListener("resize", resize);
 
-/* ===== ESTADO ===== */
-let mode="select", team="A", tactic="offensive";
-let objects=[], arrows=[];
-let dragging=null, selected=null, arrowStart=null;
+let mode="select";
+let objects=[];
+let arrows=[];
+let dragging=null;
+let selected=null;
+let arrowStart=null;
 
-/* ===== MODOS ===== */
-function setMode(m,btn){
-  mode=m;
-  document.querySelectorAll("#toolbar button").forEach(b=>b.classList.remove("active"));
-  if(btn) btn.classList.add("active");
-}
-function setTeam(t,btn){
-  team=t;
-  document.querySelectorAll("#toolbar button").forEach(b=>{
-    if(b.textContent.includes("Equipo")) b.classList.remove("active");
-  });
-  if(btn) btn.classList.add("active");
-}
-
-/* ===== CANCHA ===== */
+/* ================= CANCHA ================= */
 function drawField(){
   ctx.fillStyle="#166534";
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
   ctx.strokeStyle="#fff";
   ctx.lineWidth=3;
-  ctx.strokeRect(100,50,canvas.width-200,canvas.height-100);
+  ctx.strokeRect(80,50,canvas.width-160,canvas.height-100);
 
   ctx.beginPath();
   ctx.moveTo(canvas.width/2,50);
@@ -117,28 +102,25 @@ function drawField(){
   ctx.arc(canvas.width/2,canvas.height/2,70,0,Math.PI*2);
   ctx.stroke();
 
-  ctx.strokeRect(80,canvas.height/2-100,20,200);
-  ctx.strokeRect(canvas.width-100,canvas.height/2-100,20,200);
+  ctx.strokeRect(60,canvas.height/2-90,20,180);
+  ctx.strokeRect(canvas.width-80,canvas.height/2-90,20,180);
 }
 
-/* ===== JUGADOR REALISTA ===== */
+/* ================= DIBUJOS ================= */
 function drawPlayer(o){
   ctx.strokeStyle=o.color;
   ctx.fillStyle=o.color;
   ctx.lineWidth=3;
 
-  // Cabeza
   ctx.beginPath();
   ctx.arc(o.x,o.y-12,7,0,Math.PI*2);
   ctx.fill();
 
-  // Torso
   ctx.beginPath();
   ctx.moveTo(o.x,o.y-4);
   ctx.lineTo(o.x,o.y+14);
   ctx.stroke();
 
-  // Brazos
   ctx.beginPath();
   ctx.moveTo(o.x,o.y+2);
   ctx.lineTo(o.x-8,o.y+10);
@@ -146,7 +128,6 @@ function drawPlayer(o){
   ctx.lineTo(o.x+8,o.y+10);
   ctx.stroke();
 
-  // Piernas
   ctx.beginPath();
   ctx.moveTo(o.x,o.y+14);
   ctx.lineTo(o.x-6,o.y+26);
@@ -154,43 +135,33 @@ function drawPlayer(o){
   ctx.lineTo(o.x+6,o.y+26);
   ctx.stroke();
 
-  // Arquero
   if(o.type==="goalie"){
     ctx.strokeStyle="yellow";
     ctx.lineWidth=2;
     ctx.strokeRect(o.x-16,o.y-22,32,50);
   }
 
-  // Nombre
   ctx.fillStyle="white";
   ctx.font="12px Arial";
   ctx.textAlign="center";
   ctx.fillText(o.name,o.x,o.y+40);
+
+  if(o===selected){
+    ctx.strokeStyle="yellow";
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.arc(o.x,o.y,30,0,Math.PI*2);
+    ctx.stroke();
+  }
 }
 
-/* ===== PELOTA REALISTA ===== */
 function drawBall(o){
   ctx.fillStyle="white";
   ctx.beginPath();
   ctx.arc(o.x,o.y,7,0,Math.PI*2);
   ctx.fill();
-
-  ctx.strokeStyle="#000";
-  ctx.lineWidth=1;
-  ctx.beginPath();
-  ctx.arc(o.x,o.y,7,0,Math.PI*2);
-  ctx.stroke();
-
-  // costuras
-  ctx.beginPath();
-  ctx.moveTo(o.x-4,o.y);
-  ctx.lineTo(o.x+4,o.y);
-  ctx.moveTo(o.x,o.y-4);
-  ctx.lineTo(o.x,o.y+4);
-  ctx.stroke();
 }
 
-/* ===== OBJETOS ===== */
 function drawObjects(){
   objects.forEach(o=>{
     if(o.type==="player"||o.type==="goalie") drawPlayer(o);
@@ -206,10 +177,9 @@ function drawObjects(){
   });
 }
 
-/* ===== FLECHAS ===== */
 function drawArrows(){
   arrows.forEach(a=>{
-    ctx.strokeStyle=a===selected?"yellow":(tactic==="offensive"?"red":"blue");
+    ctx.strokeStyle = a===selected ? "yellow" : "red";
     ctx.lineWidth=4;
     ctx.beginPath();
     ctx.moveTo(a.from.x,a.from.y);
@@ -218,7 +188,7 @@ function drawArrows(){
   });
 }
 
-/* ===== RENDER ===== */
+/* ================= RENDER ================= */
 function render(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   drawField();
@@ -228,18 +198,24 @@ function render(){
 }
 render();
 
-/* ===== EVENTOS ===== */
+/* ================= EVENTOS ================= */
 canvas.addEventListener("mousedown",e=>{
   const x=e.offsetX,y=e.offsetY;
-  dragging=null; selected=null;
+  selected=null;
+  dragging=null;
 
   if(mode==="player"||mode==="goalie"){
     const name=prompt("Nombre:");
     if(!name) return;
-    const color=team==="A"?"#2563eb":"#dc2626";
-    objects.push({type:mode,x,y,name,color});
+    objects.push({
+      type:mode,
+      x,y,
+      name,
+      color: mode==="goalie"?"#fde047":"#2563eb"
+    });
     return;
   }
+
   if(mode==="cone"){objects.push({type:"cone",x,y});return;}
   if(mode==="ball"){objects.push({type:"ball",x,y});return;}
 
@@ -247,18 +223,25 @@ canvas.addEventListener("mousedown",e=>{
     objects.forEach(o=>{
       if(Math.hypot(o.x-x,o.y-y)<20){
         arrowStart=o;
-        arrows.push({from:o,to:{x,y}});
+        const a={from:o,to:{x,y}};
+        arrows.push(a);
+        selected=a;
       }
     });
     return;
   }
 
   objects.forEach(o=>{
-    if(Math.hypot(o.x-x,o.y-y)<20) dragging=o,selected=o;
+    if(Math.hypot(o.x-x,o.y-y)<20){
+      dragging=o;
+      selected=o;
+    }
   });
 
   arrows.forEach(a=>{
-    if(Math.hypot(a.to.x-x,a.to.y-y)<10) selected=a;
+    const d=Math.abs((a.to.y-a.from.y)*x-(a.to.x-a.from.x)*y+a.to.x*a.from.y-a.to.y*a.from.x)/
+      Math.hypot(a.to.y-a.from.y,a.to.x-a.from.x);
+    if(d<6) selected=a;
   });
 });
 
@@ -270,41 +253,43 @@ canvas.addEventListener("mousemove",e=>{
 
 canvas.addEventListener("mouseup",()=>{dragging=null;arrowStart=null;});
 
-/* DOBLE CLICK EDITA NOMBRE */
-canvas.addEventListener("dblclick",e=>{
-  const x=e.offsetX,y=e.offsetY;
-  objects.forEach(o=>{
-    if((o.type==="player"||o.type==="goalie") && Math.hypot(o.x-x,o.y-y)<20){
-      const n=prompt("Editar nombre:",o.name);
-      if(n) o.name=n;
-    }
-  });
-});
-
-/* ===== BORRAR ===== */
+/* ================= BOTONES ================= */
 function deleteSelected(){
   if(!selected) return;
-  objects=objects.filter(o=>o!==selected);
-  arrows=arrows.filter(a=>a!==selected);
+  objects = objects.filter(o=>o!==selected);
+  arrows = arrows.filter(a=>a!==selected);
   selected=null;
 }
 
-/* ===== ACCIONES ===== */
-function toggleTactic(){tactic=tactic==="offensive"?"defensive":"offensive";}
 function animatePlay(){
   arrows.forEach(a=>{
     const o=a.from,t=a.to;
     const i=setInterval(()=>{
-      o.x+=(t.x-o.x)*0.1;
-      o.y+=(t.y-o.y)*0.1;
+      o.x+=(t.x-o.x)*0.15;
+      o.y+=(t.y-o.y)*0.15;
       if(Math.hypot(o.x-t.x,o.y-t.y)<1) clearInterval(i);
     },16);
   });
 }
-function saveState(){localStorage.setItem("futsalPro",JSON.stringify({objects,arrows}));}
+
+function saveState(){
+  localStorage.setItem("futsalPro",JSON.stringify({objects,arrows}));
+  alert("Jugada guardada");
+}
+
 function loadState(){
   const d=JSON.parse(localStorage.getItem("futsalPro"));
-  if(d){objects=d.objects;arrows=d.arrows;}
+  if(d){
+    objects=d.objects||[];
+    arrows=d.arrows||[];
+    alert("Jugada cargada");
+  }
+}
+
+function setMode(m,btn){
+  mode=m;
+  document.querySelectorAll("#toolbar button").forEach(b=>b.classList.remove("active"));
+  if(btn) btn.classList.add("active");
 }
 </script>
 
