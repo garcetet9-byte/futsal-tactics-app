@@ -2,296 +2,289 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Futsal Tactics Pro</title>
+<title>Pizarra Futsal Pro</title>
+
 <style>
 html,body{
-  margin:0;padding:0;overflow:hidden;
-  background:#111;font-family:Arial;
+  margin:0;
+  padding:0;
+  overflow:hidden;
+  font-family:Arial, Helvetica, sans-serif;
+  background:#0f172a;
 }
+
 #toolbar{
-  position:fixed;top:0;left:0;right:0;height:52px;
-  background:#2c2c2c;
-  display:flex;gap:6px;padding:6px;z-index:10;
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  height:60px;
+  background:#111827;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:6px;
+  z-index:10;
 }
-button{
-  border:none;border-radius:6px;
-  padding:6px 10px;font-weight:bold;
+
+#toolbar button{
+  background:#f3f4f6;
+  border:none;
+  border-radius:6px;
+  padding:6px 10px;
+  font-weight:bold;
   cursor:pointer;
 }
-canvas{display:block;}
-#stepLabel{color:white;padding-left:10px;}
+
+#toolbar button.active{
+  background:#22c55e;
+  color:white;
+}
+
+canvas{
+  position:absolute;
+  top:60px;
+  left:0;
+}
 </style>
 </head>
+
 <body>
 
 <div id="toolbar">
-<button onclick="setMode('select')">🖱 Seleccionar</button>
-<button onclick="setMode('player')">+ Jugador</button>
-<button onclick="setMode('goalie')">+ Arquero</button>
-<button onclick="setMode('cone')">+ Cono</button>
-<button onclick="setMode('ball')">⚽ Pelota</button>
-<button onclick="setMode('arrow')">➡ Flecha</button>
-<button onclick="deleteArrow()">🗑 Flecha</button>
-<button onclick="toggleTactic()">🧠 Of/Def</button>
-<button onclick="animate()">▶ Animar</button>
-<button onclick="addStep()">➕ Paso</button>
-<button onclick="prevStep()">⏮</button>
-<button onclick="nextStep()">⏭</button>
-<button onclick="playTimeline()">🎬 Play</button>
-<button onclick="savePlay()">💾 Guardar</button>
-<button onclick="loadPlay()">📂 Cargar</button>
-<button onclick="team='A'" style="background:#3b82f6;color:white">Equipo A</button>
-<button onclick="team='B'" style="background:#ef4444;color:white">Equipo B</button>
-<span id="stepLabel">Paso 0/0</span>
+  <button onclick="setMode('select', this)">Seleccionar</button>
+  <button onclick="setMode('player', this)">+ Jugador</button>
+  <button onclick="setMode('goalie', this)">+ Arquero</button>
+  <button onclick="setMode('cone', this)">+ Cono</button>
+  <button onclick="setMode('ball', this)">⚽ Pelota</button>
+  <button onclick="setMode('arrow', this)">➝ Flecha</button>
+  <button onclick="deleteArrow()">🗑 Flecha</button>
+  <button onclick="toggleTactic()">🧠 Of/Def</button>
+  <button onclick="animatePlay()">▶ Animar</button>
+  <button onclick="saveState()">💾 Guardar</button>
+  <button onclick="loadState()">📂 Cargar</button>
+  <button onclick="setTeam('A', this)">Equipo A</button>
+  <button onclick="setTeam('B', this)">Equipo B</button>
 </div>
 
 <canvas id="canvas"></canvas>
 
 <script>
-const canvas=document.getElementById("canvas");
-const ctx=canvas.getContext("2d");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
 function resize(){
-  canvas.width=window.innerWidth;
-  canvas.height=window.innerHeight;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight - 60;
 }
-resize(); window.onresize=resize;
+resize();
+window.addEventListener("resize", resize);
 
-/* ====== ESTADO ====== */
-let mode="select", team="A";
-let tactic="offensive";
-let scale=1, offsetX=canvas.width/2, offsetY=canvas.height/2;
+/* ======= ESTADO ======= */
+let mode = "select";
+let team = "A";
+let tactic = "offensive";
 
-const objects=[];
-let arrows=[];
-let dragging=null;
-let selectedArrow=null;
-let arrowStartPlayer=null;
+let objects = [];
+let arrows = [];
 
-/* ===== TIMELINE ===== */
-let timeline=[], currentStep=-1, playingTimeline=false;
+let dragging = null;
+let selectedArrow = null;
+let arrowStartObject = null;
 
-/* ===== UTILS ===== */
-function world(x,y){
-  return {x:(x-offsetX)/scale, y:(y-offsetY)/scale};
+/* ======= MODOS ======= */
+function setMode(m, btn){
+  mode = m;
+  document.querySelectorAll("#toolbar button").forEach(b=>b.classList.remove("active"));
+  if(btn) btn.classList.add("active");
 }
 
-/* ===== CANCHA ===== */
+function setTeam(t, btn){
+  team = t;
+  document.querySelectorAll("#toolbar button").forEach(b=>{
+    if(b.textContent.includes("Equipo")) b.classList.remove("active");
+  });
+  if(btn) btn.classList.add("active");
+}
+
+/* ======= DIBUJAR CANCHA ======= */
 function drawField(){
-  const W=1000,H=600,A=120,G=200;
+  ctx.fillStyle="#166534";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  ctx.fillStyle=tactic==="offensive"?"#1e7c28":"#14532d";
-  ctx.fillRect(-3000,-3000,6000,6000);
+  ctx.strokeStyle="#ffffff";
+  ctx.lineWidth=3;
 
-  ctx.strokeStyle=tactic==="offensive"?"#fff":"#60a5fa";
-  ctx.lineWidth=4;
+  ctx.strokeRect(100,50,canvas.width-200,canvas.height-100);
 
-  ctx.strokeRect(-W/2,-H/2,W,H);
-  ctx.beginPath();ctx.moveTo(0,-H/2);ctx.lineTo(0,H/2);ctx.stroke();
-  ctx.beginPath();ctx.arc(0,0,80,0,Math.PI*2);ctx.stroke();
-
-  ctx.beginPath();ctx.arc(-W/2,0,A,-Math.PI/2,Math.PI/2);ctx.stroke();
-  ctx.beginPath();ctx.arc(W/2,0,A,Math.PI/2,-Math.PI/2);ctx.stroke();
-
-  ctx.strokeRect(-W/2-20,-G/2,20,G);
-  ctx.strokeRect(W/2,-G/2,20,G);
-
-  ctx.fillStyle="rgba(255,255,255,0.4)";
-  ctx.font="12px Arial";
-  for(let i=-400;i<=400;i+=200){
-    ctx.fillText(i/10,i, -H/2-10);
-    ctx.fillText(i/10,i, H/2+20);
-  }
-}
-
-/* ===== OBJETOS ===== */
-function drawObjects(){
-objects.forEach(o=>{
-  if(o.type==="player"||o.type==="goalie"){
-    ctx.fillStyle=o.color;
-    ctx.beginPath();ctx.arc(o.x,o.y,12,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(o.x,o.y-14,7,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle="white";
-    ctx.font="12px Arial";
-    ctx.textAlign="center";
-    ctx.fillText(o.name,o.x,o.y+28);
-  }
-  if(o.type==="goalie"){
-    ctx.strokeStyle="yellow";
-    ctx.lineWidth=2;
-    ctx.strokeRect(o.x-16,o.y-16,32,32);
-  }
-  if(o.type==="cone"){
-    ctx.fillStyle="orange";
-    ctx.beginPath();
-    ctx.moveTo(o.x,o.y);
-    ctx.lineTo(o.x-10,o.y+20);
-    ctx.lineTo(o.x+10,o.y+20);
-    ctx.fill();
-  }
-  if(o.type==="ball"){
-    ctx.fillStyle="white";
-    ctx.beginPath();ctx.arc(o.x,o.y,6,0,Math.PI*2);ctx.fill();
-  }
-});
-}
-
-/* ===== FLECHAS ===== */
-function drawArrows(){
-arrows.forEach(a=>{
-  ctx.strokeStyle=a===selectedArrow?"yellow":"red";
-  ctx.lineWidth=4;
   ctx.beginPath();
-  ctx.moveTo(a.player.x,a.player.y);
-  ctx.lineTo(a.x2,a.y2);
+  ctx.moveTo(canvas.width/2,50);
+  ctx.lineTo(canvas.width/2,canvas.height-50);
   ctx.stroke();
-});
+
+  ctx.beginPath();
+  ctx.arc(canvas.width/2,canvas.height/2,70,0,Math.PI*2);
+  ctx.stroke();
+
+  ctx.strokeRect(80,canvas.height/2-100,20,200);
+  ctx.strokeRect(canvas.width-100,canvas.height/2-100,20,200);
 }
 
-/* ===== RENDER ===== */
+/* ======= DIBUJAR OBJETOS ======= */
+function drawObjects(){
+  objects.forEach(o=>{
+    if(o.type==="player"||o.type==="goalie"){
+      ctx.fillStyle=o.color;
+      ctx.beginPath();
+      ctx.arc(o.x,o.y,14,0,Math.PI*2);
+      ctx.fill();
+
+      ctx.fillStyle="white";
+      ctx.font="12px Arial";
+      ctx.textAlign="center";
+      ctx.fillText(o.name,o.x,o.y+30);
+
+      if(o.type==="goalie"){
+        ctx.strokeStyle="yellow";
+        ctx.lineWidth=2;
+        ctx.strokeRect(o.x-20,o.y-20,40,40);
+      }
+    }
+
+    if(o.type==="cone"){
+      ctx.fillStyle="orange";
+      ctx.beginPath();
+      ctx.moveTo(o.x,o.y);
+      ctx.lineTo(o.x-10,o.y+20);
+      ctx.lineTo(o.x+10,o.y+20);
+      ctx.fill();
+    }
+
+    if(o.type==="ball"){
+      ctx.fillStyle="white";
+      ctx.beginPath();
+      ctx.arc(o.x,o.y,6,0,Math.PI*2);
+      ctx.fill();
+    }
+  });
+}
+
+/* ======= FLECHAS ======= */
+function drawArrows(){
+  arrows.forEach(a=>{
+    ctx.strokeStyle = a===selectedArrow ? "yellow" : (tactic==="offensive"?"red":"blue");
+    ctx.lineWidth=4;
+    ctx.beginPath();
+    ctx.moveTo(a.from.x,a.from.y);
+    ctx.lineTo(a.to.x,a.to.y);
+    ctx.stroke();
+  });
+}
+
+/* ======= RENDER ======= */
 function render(){
-ctx.setTransform(1,0,0,1,0,0);
-ctx.clearRect(0,0,canvas.width,canvas.height);
-ctx.translate(offsetX,offsetY);
-ctx.scale(scale,scale);
-drawField();
-drawArrows();
-drawObjects();
-requestAnimationFrame(render);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawField();
+  drawArrows();
+  drawObjects();
+  requestAnimationFrame(render);
 }
 render();
 
-/* ===== EVENTOS ===== */
-canvas.onmousedown=e=>{
-const p=world(e.clientX,e.clientY);
-dragging=null;selectedArrow=null;
+/* ======= EVENTOS ======= */
+canvas.addEventListener("mousedown", e=>{
+  const x = e.offsetX;
+  const y = e.offsetY;
 
-if(mode==="player"||mode==="goalie"){
-  const name=prompt("Nombre:");
-  if(!name)return;
-  const color=team==="A"?"#3b82f6":"#ef4444";
-  objects.push({type:mode,x:p.x,y:p.y,name,color});
-}
-if(mode==="cone")objects.push({type:"cone",x:p.x,y:p.y});
-if(mode==="ball")objects.push({type:"ball",x:p.x,y:p.y});
+  dragging = null;
+  selectedArrow = null;
 
-if(mode==="arrow"){
+  if(mode==="player" || mode==="goalie"){
+    const name = prompt("Nombre del jugador:");
+    if(!name) return;
+
+    const color = team==="A" ? "#2563eb" : "#dc2626";
+    objects.push({type:mode,x,y,name,color});
+    return;
+  }
+
+  if(mode==="cone"){ objects.push({type:"cone",x,y}); return; }
+  if(mode==="ball"){ objects.push({type:"ball",x,y}); return; }
+
+  if(mode==="arrow"){
+    objects.forEach(o=>{
+      if(Math.hypot(o.x-x,o.y-y)<15){
+        arrowStartObject=o;
+        arrows.push({from:o,to:{x,y}});
+      }
+    });
+  }
+
   objects.forEach(o=>{
-    if(Math.hypot(o.x-p.x,o.y-p.y)<15)arrowStartPlayer=o;
+    if(Math.hypot(o.x-x,o.y-y)<15) dragging=o;
   });
-  if(arrowStartPlayer)arrows.push({player:arrowStartPlayer,x2:p.x,y2:p.y});
-}
 
-objects.forEach(o=>{
-  if(Math.hypot(o.x-p.x,o.y-p.y)<15)dragging=o;
+  arrows.forEach(a=>{
+    if(Math.hypot(a.to.x-x,a.to.y-y)<10) selectedArrow=a;
+  });
 });
-arrows.forEach(a=>{
-  if(Math.hypot(a.x2-p.x,a.y2-p.y)<10)selectedArrow=a;
-});
-};
 
-canvas.onmousemove=e=>{
-const p=world(e.clientX,e.clientY);
-if(dragging){dragging.x=p.x;dragging.y=p.y;}
-if(mode==="arrow"&&arrowStartPlayer){
-  let last=arrows[arrows.length-1];
-  last.x2=p.x; last.y2=p.y;
-}
-};
-canvas.onmouseup=()=>{dragging=null;arrowStartPlayer=null;};
+canvas.addEventListener("mousemove", e=>{
+  const x=e.offsetX;
+  const y=e.offsetY;
 
-canvas.ondblclick=e=>{
-const p=world(e.clientX,e.clientY);
-objects.forEach(o=>{
-  if(Math.hypot(o.x-p.x,o.y-p.y)<15){
-    const n=prompt("Nuevo nombre:",o.name);
-    if(n)o.name=n;
+  if(dragging){
+    dragging.x=x;
+    dragging.y=y;
+  }
+
+  if(mode==="arrow" && arrowStartObject){
+    arrows[arrows.length-1].to = {x,y};
   }
 });
-};
 
-canvas.onwheel=e=>{
-scale+=e.deltaY*-0.001;
-scale=Math.min(Math.max(scale,0.3),3);
-};
-
-/* ===== ACCIONES ===== */
-function deleteArrow(){
-if(selectedArrow){
-  arrows=arrows.filter(a=>a!==selectedArrow);
-  selectedArrow=null;
-}}
-function toggleTactic(){tactic=tactic==="offensive"?"defensive":"offensive";}
-
-function animate(){
-arrows.forEach(a=>{
-const id=setInterval(()=>{
-a.player.x+=(a.x2-a.player.x)*0.1;
-a.player.y+=(a.y2-a.player.y)*0.1;
-if(Math.hypot(a.player.x-a.x2,a.player.y-a.y2)<2)clearInterval(id);
-},16);
+canvas.addEventListener("mouseup", ()=>{
+  dragging=null;
+  arrowStartObject=null;
 });
+
+/* ======= ACCIONES ======= */
+function deleteArrow(){
+  if(selectedArrow){
+    arrows = arrows.filter(a=>a!==selectedArrow);
+    selectedArrow=null;
+  }
 }
 
-/* ===== TIMELINE ===== */
-function cloneState(){
-return {
-objects:JSON.parse(JSON.stringify(objects)),
-arrows:JSON.parse(JSON.stringify(arrows))
-};
-}
-function restoreState(s){
-objects.length=0;arrows.length=0;
-s.objects.forEach(o=>objects.push(o));
-s.arrows.forEach(a=>arrows.push(a));
-}
-function updateStepLabel(){
-stepLabel.innerText=`Paso ${currentStep+1}/${timeline.length}`;
-}
-function addStep(){
-timeline.push(cloneState());
-currentStep=timeline.length-1;
-updateStepLabel();
-}
-function animateToStep(i){
-const t=timeline[i]; if(!t)return;
-let k=0;
-const id=setInterval(()=>{
-k+=0.05;
-objects.forEach((o,j)=>{
-if(t.objects[j]){
-o.x+=(t.objects[j].x-o.x)*0.2;
-o.y+=(t.objects[j].y-o.y)*0.2;
-}});
-if(k>=1){
-restoreState(t);currentStep=i;updateStepLabel();
-clearInterval(id);
-}},16);
-}
-function nextStep(){if(currentStep<timeline.length-1)animateToStep(currentStep+1);}
-function prevStep(){if(currentStep>0)animateToStep(currentStep-1);}
-function playTimeline(){
-if(playingTimeline||timeline.length===0)return;
-playingTimeline=true;let i=0;
-(function loop(){
-if(i>=timeline.length){playingTimeline=false;return;}
-animateToStep(i++);setTimeout(loop,900);
-})();
+function toggleTactic(){
+  tactic = tactic==="offensive"?"defensive":"offensive";
 }
 
-/* ===== GUARDADO ===== */
-function savePlay(){
-localStorage.setItem("futsalPro",JSON.stringify({objects,arrows,timeline}));
+function animatePlay(){
+  arrows.forEach(a=>{
+    const obj=a.from;
+    const target=a.to;
+    const interval=setInterval(()=>{
+      obj.x += (target.x-obj.x)*0.1;
+      obj.y += (target.y-obj.y)*0.1;
+      if(Math.hypot(obj.x-target.x,obj.y-target.y)<1){
+        clearInterval(interval);
+      }
+    },16);
+  });
 }
-function loadPlay(){
-const d=JSON.parse(localStorage.getItem("futsalPro"));
-if(!d)return;
-objects.length=0;arrows.length=0;timeline=[];
-d.objects.forEach(o=>objects.push(o));
-d.arrows.forEach(a=>arrows.push(a));
-timeline=d.timeline||[];
-currentStep=-1;updateStepLabel();
+
+function saveState(){
+  localStorage.setItem("futsalPro", JSON.stringify({objects,arrows}));
+}
+
+function loadState(){
+  const data = JSON.parse(localStorage.getItem("futsalPro"));
+  if(!data) return;
+  objects=data.objects;
+  arrows=data.arrows;
 }
 </script>
+
 </body>
 </html>
