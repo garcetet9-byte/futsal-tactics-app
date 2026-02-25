@@ -1,338 +1,264 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>⚽ Futsal Tactics Pro</title>
+<meta charset="UTF-8">
+<title>Futsal Tactics Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-
-body{
-    font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;
-    background:#121212;
-    color:#fff;
-    height:100vh;
-    display:flex;
-}
-
-.container{
-    display:flex;
-    width:100%;
-    padding:10px;
-    gap:10px;
-}
-
-.main{
-    flex:1;
-    display:flex;
-    flex-direction:column;
-    gap:10px;
-    background:#1e1e1e;
-    border-radius:10px;
-    padding:10px;
-}
-
-.header{
-    background:linear-gradient(135deg,#667eea,#764ba2);
-    padding:15px;
-    border-radius:10px;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-}
-
-.header h1{font-size:22px}
-
-.toolbar{
-    display:flex;
-    gap:10px;
-    background:#2a2a2a;
-    padding:10px;
-    border-radius:8px;
-}
-
-.toolbar button{
-    background:#667eea;
-    color:#fff;
-    border:none;
-    padding:8px 14px;
-    border-radius:6px;
-    cursor:pointer;
-    font-weight:600;
-}
-
-.toolbar button.active{background:#764ba2}
-
-#canvas{
-    flex:1;
-    background:#1f7a1f;
-    border-radius:10px;
-}
-
-.sidebar{
-    width:280px;
-    background:#1e1e1e;
-    border-radius:10px;
-    padding:15px;
-    display:flex;
-    flex-direction:column;
-    gap:15px;
-}
-
-.section{
-    background:#2a2a2a;
-    border-radius:8px;
-    padding:12px;
-}
-
-.section h3{
-    font-size:13px;
-    margin-bottom:10px;
-    color:#bbb;
-}
-
-.section button{
-    width:100%;
-    margin-bottom:6px;
-    padding:8px;
-    background:#667eea;
-    border:none;
-    border-radius:6px;
-    color:white;
-    cursor:pointer;
-}
-
-.player-item{
-    background:#3a3a3a;
-    padding:6px;
-    border-radius:6px;
-    font-size:12px;
-    margin-bottom:5px;
-}
-
-.modal{
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,.7);
-    display:none;
-    align-items:center;
-    justify-content:center;
-}
-
-.modal.active{display:flex}
-
-.modal-content{
-    background:#1e1e1e;
-    padding:20px;
-    border-radius:10px;
-    width:300px;
-}
-
-.modal-content input,select{
-    width:100%;
-    padding:8px;
-    margin-bottom:10px;
-    background:#2a2a2a;
-    color:white;
-    border:1px solid #444;
-    border-radius:6px;
-}
-
-.modal-content button{
-    width:100%;
-    padding:10px;
-    background:#667eea;
-    border:none;
-    border-radius:6px;
-    color:white;
-}
+body { margin:0; background:#1e1e1e; color:white; font-family:Arial }
+header { padding:12px 20px; background:linear-gradient(90deg,#4e73df,#6f42c1); font-size:20px }
+.toolbar { padding:10px; background:#2b2b2b }
+button { margin-right:6px; padding:6px 12px; border:none; border-radius:6px; cursor:pointer; font-weight:bold }
+.select{background:#4e73df;color:white}
+.arrow{background:#ffc107;color:black}
+.save{background:#20c997;color:black}
+.load{background:#6f42c1;color:white}
+.clear{background:#dc3545;color:white}
+.container{display:flex}
+canvas{margin:10px;border:3px solid #0f4d0f;border-radius:10px;background:#1f7a1f}
+.sidebar{width:240px;background:#2b2b2b;padding:10px}
+.player-btn{width:100%;margin-bottom:6px;background:#4e73df;color:white}
 </style>
 </head>
 
 <body>
+
+<header>⚽ Futsal Tactics Pro</header>
+
+<div class="toolbar">
+  <button class="select" onclick="mode='select'">Seleccionar</button>
+  <button class="arrow" onclick="mode='arrow'">Flecha</button>
+  <button onclick="animatePlay()">▶ Animar</button>
+  <button class="save" onclick="savePlay()">Guardar</button>
+  <button class="load" onclick="loadPlay()">Cargar</button>
+  <button class="clear" onclick="clearBoard()">Limpiar</button>
+</div>
+
 <div class="container">
+  <canvas id="board" width="1000" height="600"></canvas>
 
-<div class="main">
-    <div class="header">
-        <h1>⚽ Futsal Tactics Pro</h1>
-        <input id="playName" placeholder="Nombre de la jugada"
-        style="padding:6px;border-radius:6px;border:none"/>
-    </div>
-
-    <div class="toolbar">
-        <button id="toolSelect" class="active">Seleccionar</button>
-        <button id="toolArrow">Flecha</button>
-        <button id="toolLine">Línea</button>
-        <button id="clearBtn" style="background:#ff6b6b">Limpiar</button>
-    </div>
-
-    <canvas id="canvas"></canvas>
-</div>
-
-<div class="sidebar">
-    <div class="section">
-        <h3>👥 Jugadores</h3>
-        <button id="addPlayerBtn">+ Agregar jugador</button>
-        <div id="playerList"></div>
-    </div>
-</div>
-
-</div>
-
-<!-- MODAL -->
-<div class="modal" id="playerModal">
-<div class="modal-content">
-    <input id="pNumber" type="number" placeholder="Número">
-    <select id="pRole">
-        <option value="arquero">Arquero</option>
-        <option value="jugador">Jugador</option>
-    </select>
-    <select id="pTeam">
-        <option value="A">Equipo A</option>
-        <option value="B">Equipo B</option>
-    </select>
-    <button id="addConfirm">Agregar</button>
-</div>
+  <div class="sidebar">
+    <h3>Jugadores</h3>
+    <button class="player-btn" onclick="addPlayer('jugador')">+ Jugador</button>
+    <button class="player-btn" onclick="addPlayer('arquero')" style="background:#ffc107;color:black">
+      + Arquero
+    </button>
+  </div>
 </div>
 
 <script>
-const Data={
-    play:{players:[],arrows:[],lines:[]},
-    createPlayer(num,role,team){
-        return{
-            id:Date.now()+Math.random(),
-            number:num,
-            role,
-            team,
-            x:20,
-            y:10,
-            color:team==="A"?"#4ECDC4":"#FF6B6B"
-        }
+const canvas = document.getElementById("board");
+const ctx = canvas.getContext("2d");
+
+let mode = "select";
+let players = [];
+let arrows = [];
+let selectedPlayer = null;
+let drawingArrow = false;
+let startX, startY;
+
+/* ===== ZOOM & ROTACION ===== */
+let scale = 1;
+let rotation = 0;
+
+/* ===== CAMPO ===== */
+function drawField() {
+  ctx.fillStyle = "#1f7a1f";
+  ctx.fillRect(-500, -300, 1000, 600);
+
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(-480, -280, 960, 560);
+
+  ctx.beginPath();
+  ctx.moveTo(0, -280);
+  ctx.lineTo(0, 280);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(0, 0, 70, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeRect(-480, -80, 40, 160);
+  ctx.strokeRect(440, -80, 40, 160);
+}
+
+/* ===== PERSONITAS ===== */
+function drawPlayer(p) {
+  ctx.save();
+  ctx.translate(p.x, p.y);
+
+  const color = p.team === "A" ? "#007bff" : "#ff4d4d";
+
+  // cabeza
+  ctx.beginPath();
+  ctx.arc(0, -18, 6, 0, Math.PI * 2);
+  ctx.fillStyle = "#f1c27d";
+  ctx.fill();
+
+  // cuerpo
+  ctx.strokeStyle = p.role === "arquero" ? "#ffc107" : color;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(0, -12);
+  ctx.lineTo(0, 10);
+  ctx.stroke();
+
+  // brazos
+  ctx.beginPath();
+  ctx.moveTo(-8, 0); ctx.lineTo(8, 0);
+  ctx.stroke();
+
+  // piernas
+  ctx.beginPath();
+  ctx.moveTo(0, 10); ctx.lineTo(-6, 22);
+  ctx.moveTo(0, 10); ctx.lineTo(6, 22);
+  ctx.stroke();
+
+  ctx.fillStyle = "white";
+  ctx.font = "12px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText(p.name, 0, 36);
+
+  ctx.restore();
+}
+
+/* ===== FLECHAS ===== */
+function drawArrows() {
+  arrows.forEach(a => {
+    const color = a.team === "A" ? "cyan" : "yellow";
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+
+    ctx.beginPath();
+    ctx.moveTo(a.from.x, a.from.y);
+    ctx.lineTo(a.to.x, a.to.y);
+    ctx.stroke();
+
+    const angle = Math.atan2(a.to.y - a.from.y, a.to.x - a.from.x);
+    const h = 14;
+    ctx.beginPath();
+    ctx.moveTo(a.to.x, a.to.y);
+    ctx.lineTo(a.to.x - h * Math.cos(angle - Math.PI/6),
+               a.to.y - h * Math.sin(angle - Math.PI/6));
+    ctx.lineTo(a.to.x - h * Math.cos(angle + Math.PI/6),
+               a.to.y - h * Math.sin(angle + Math.PI/6));
+    ctx.fillStyle = color;
+    ctx.fill();
+  });
+}
+
+/* ===== RENDER ===== */
+function render() {
+  ctx.save();
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.translate(canvas.width/2, canvas.height/2);
+  ctx.scale(scale, scale);
+  ctx.rotate(rotation);
+
+  drawField();
+  drawArrows();
+  players.forEach(drawPlayer);
+
+  ctx.restore();
+}
+
+/* ===== JUGADORES ===== */
+function addPlayer(role) {
+  const name = prompt("Nombre:");
+  const team = prompt("Equipo A o B").toUpperCase();
+  if (!name || !["A","B"].includes(team)) return;
+
+  players.push({
+    id: crypto.randomUUID(),
+    x: 0, y: 0,
+    name, role, team
+  });
+  render();
+}
+
+/* ===== INTERACCION ===== */
+canvas.addEventListener("mousedown", e => {
+  const r = canvas.getBoundingClientRect();
+  const x = (e.clientX - r.left - canvas.width/2) / scale;
+  const y = (e.clientY - r.top - canvas.height/2) / scale;
+
+  if (mode === "select") {
+    selectedPlayer = players.find(p => Math.hypot(p.x - x, p.y - y) < 20);
+  }
+  if (mode === "arrow" && selectedPlayer) {
+    drawingArrow = true;
+    startX = selectedPlayer.x;
+    startY = selectedPlayer.y;
+  }
+});
+
+canvas.addEventListener("mousemove", e => {
+  if (selectedPlayer && mode === "select") {
+    const r = canvas.getBoundingClientRect();
+    selectedPlayer.x = (e.clientX - r.left - canvas.width/2) / scale;
+    selectedPlayer.y = (e.clientY - r.top - canvas.height/2) / scale;
+    render();
+  }
+});
+
+canvas.addEventListener("mouseup", e => {
+  if (drawingArrow && selectedPlayer) {
+    const r = canvas.getBoundingClientRect();
+    arrows.push({
+      playerId: selectedPlayer.id,
+      team: selectedPlayer.team,
+      from: { x:startX, y:startY },
+      to: {
+        x:(e.clientX - r.left - canvas.width/2)/scale,
+        y:(e.clientY - r.top - canvas.height/2)/scale
+      }
+    });
+    drawingArrow = false;
+    render();
+  }
+});
+
+/* ===== ZOOM & ROTACION ===== */
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  if (e.altKey) rotation += e.deltaY * 0.001;
+  else scale += e.deltaY * -0.001;
+  scale = Math.min(Math.max(scale, 0.5), 2);
+  render();
+});
+
+/* ===== ANIMACION ===== */
+function animatePlay() {
+  arrows.forEach(a => {
+    const p = players.find(pl => pl.id === a.playerId);
+    if (!p) return;
+    let t = 0;
+    function step(){
+      t+=0.02;
+      p.x = a.from.x + (a.to.x-a.from.x)*t;
+      p.y = a.from.y + (a.to.y-a.from.y)*t;
+      render();
+      if(t<1) requestAnimationFrame(step);
     }
+    step();
+  });
 }
 
-const Canvas={
-    el:document.getElementById("canvas"),
-    ctx:null,
-    rw:40,rh:20,
-    init(){
-        this.ctx=this.el.getContext("2d");
-        this.resize();
-        window.addEventListener("resize",()=>this.resize());
-    },
-    resize(){
-        this.el.width=this.el.clientWidth;
-        this.el.height=this.el.clientHeight;
-    },
-    rt(x,y){
-        const p=20;
-        return{
-            x:p+x*(this.el.width-40)/this.rw,
-            y:p+y*(this.el.height-40)/this.rh
-        }
-    },
-    drawField(){
-        const c=this.ctx;
-        c.fillStyle="#1f7a1f";
-        c.fillRect(0,0,this.el.width,this.el.height);
-        c.strokeStyle="#fff";
-        c.lineWidth=2;
-        c.strokeRect(20,20,this.el.width-40,this.el.height-40);
-    },
-
-    // ✅ JUGADOR HUMANO (VISTA AÉREA)
-    drawPlayer(p){
-        const pos=this.rt(p.x,p.y);
-        const c=this.ctx;
-        const size=22;
-
-        c.save();
-
-        // sombra
-        c.shadowColor="rgba(0,0,0,.4)";
-        c.shadowBlur=6;
-        c.shadowOffsetY=3;
-
-        // cuerpo
-        c.fillStyle=p.color;
-        c.beginPath();
-        c.roundRect(pos.x-size/2,pos.y-size/4,size,size,6);
-        c.fill();
-
-        // cabeza
-        c.shadowBlur=0;
-        c.fillStyle="#f1c27d";
-        c.beginPath();
-        c.arc(pos.x,pos.y-size/2.3,size/3,0,Math.PI*2);
-        c.fill();
-
-        // numero
-        c.fillStyle="#fff";
-        c.font="bold 11px Arial";
-        c.textAlign="center";
-        c.fillText(p.number,pos.x,pos.y+2);
-
-        c.restore();
-    },
-
-    render(){
-        this.drawField();
-        Data.play.players.forEach(p=>this.drawPlayer(p));
-    }
+/* ===== GUARDAR ===== */
+function savePlay(){
+  localStorage.setItem("futsalPro",JSON.stringify({players,arrows}));
+  alert("Jugada guardada");
 }
-
-const UI={
-    init(){
-        Canvas.init();
-        this.loop();
-
-        toolSelect.onclick=()=>setTool("select");
-        toolArrow.onclick=()=>setTool("arrow");
-        toolLine.onclick=()=>setTool("line");
-
-        clearBtn.onclick=()=>{
-            Data.play.players=[];
-        }
-
-        addPlayerBtn.onclick=()=>{
-            playerModal.classList.add("active");
-        }
-
-        addConfirm.onclick=()=>{
-            Data.play.players.push(
-                Data.createPlayer(
-                    pNumber.value,
-                    pRole.value,
-                    pTeam.value
-                )
-            );
-            playerModal.classList.remove("active");
-            this.updateList();
-        }
-    },
-    updateList(){
-        playerList.innerHTML="";
-        Data.play.players.forEach(p=>{
-            const d=document.createElement("div");
-            d.className="player-item";
-            d.textContent="#"+p.number+" "+p.role;
-            d.style.borderLeft="4px solid "+p.color;
-            playerList.appendChild(d);
-        });
-    },
-    loop(){
-        Canvas.render();
-        requestAnimationFrame(()=>this.loop());
-    }
+function loadPlay(){
+  const d = JSON.parse(localStorage.getItem("futsalPro"));
+  if(!d) return alert("No hay jugada");
+  players=d.players; arrows=d.arrows; render();
 }
+function clearBoard(){ players=[]; arrows=[]; render(); }
 
-function setTool(t){
-    document.querySelectorAll(".toolbar button").forEach(b=>b.classList.remove("active"));
-    document.getElementById("tool"+t.charAt(0).toUpperCase()+t.slice(1)).classList.add("active");
-}
-
-UI.init();
+render();
 </script>
 </body>
 </html>
