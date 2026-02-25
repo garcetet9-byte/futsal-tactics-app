@@ -3,319 +3,275 @@
 <head>
 <meta charset="UTF-8">
 <title>Futsal Tactics Pro</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-body{margin:0;background:#111;font-family:Arial;overflow:hidden;color:white;}
-header{background:linear-gradient(90deg,#4e73df,#6f42c1);padding:8px 15px;}
-.toolbar{background:#2b2b2b;padding:6px;display:flex;flex-wrap:wrap;gap:5px;}
-button{padding:5px 10px;border:none;border-radius:5px;font-weight:bold;cursor:pointer;}
-canvas{display:block;background:#197a1f;}
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #111;
+  }
+
+  #toolbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 42px;
+    background: linear-gradient(90deg,#4e6bd8,#7b4bd8);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px;
+    z-index: 10;
+  }
+
+  button {
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+  }
+
+  canvas {
+    display: block;
+  }
 </style>
 </head>
 <body>
 
-<header>⚽ Futsal Tactics Pro</header>
-
-<div class="toolbar">
-<button onclick="mode='select'">Seleccionar</button>
-<button onclick="mode='arrow'">Flecha</button>
-<button onclick="addPlayer('jugador')">+ Jugador</button>
-<button onclick="addPlayer('arquero')">+ Arquero</button>
-<button onclick="addCone()">+ Cono</button>
-<button onclick="addBall()">+ Pelota</button>
-<button onclick="toggleTactic()">Modo Ofensivo/Defensivo</button>
-<button onclick="animatePlay()">▶ Animar</button>
-<button onclick="deleteSelectedArrow()">Borrar flecha</button>
-<button onclick="savePlay()">Guardar</button>
-<button onclick="loadPlay()">Cargar</button>
+<div id="toolbar">
+  <button onclick="mode='select'">Seleccionar</button>
+  <button onclick="mode='player'">+ Jugador</button>
+  <button onclick="mode='goalie'">+ Arquero</button>
+  <button onclick="mode='cone'">+ Cono</button>
+  <button onclick="mode='ball'">+ Pelota</button>
+  <button onclick="mode='arrow'">Flecha</button>
+  <button onclick="animate()">▶ Animar</button>
+  <button onclick="deleteArrow()">🗑 Flecha</button>
+  <button onclick="savePlay()">💾 Guardar</button>
+  <button onclick="loadPlay()">📂 Cargar</button>
 </div>
 
-<canvas id="board"></canvas>
+<canvas id="canvas"></canvas>
 
 <script>
-const canvas=document.getElementById("board");
-const ctx=canvas.getContext("2d");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
-function resize(){
-canvas.width=window.innerWidth;
-canvas.height=window.innerHeight-80;
-render();
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let scale = 1;
+let offsetX = canvas.width / 2;
+let offsetY = canvas.height / 2;
+
+let mode = "select";
+let dragging = null;
+let arrows = [];
+let arrowTemp = null;
+let selectedArrow = null;
+
+const objects = [];
+
+function worldPos(x,y){
+  return {
+    x:(x-offsetX)/scale,
+    y:(y-offsetY)/scale
+  }
 }
-window.addEventListener("resize",resize);
-resize();
 
-let mode="select";
-let players=[], arrows=[], cones=[], balls=[];
-let dragging=null;
-let selectedArrow=null;
-let arrowFrom=null;
-let arrowStart=null;
-let scale=1;
-let tacticMode="ofensivo";
-
-/* ================= FIELD ================= */
+/* ================== CANCHA ================== */
 function drawField(){
-const W=1000;
-const H=600;
-const areaR=110;
-const goalH=180;
+  const W = 1000;
+  const H = 600;
+  const areaR = 120;
+  const goalH = 200;
 
-ctx.fillStyle="#197a1f";
-ctx.fillRect(-2000,-2000,4000,4000);
+  ctx.fillStyle = "#197a1f";
+  ctx.fillRect(-W/2-300,-H/2-300,W+600,H+600);
 
-ctx.strokeStyle="white";
-ctx.lineWidth=4;
+  ctx.strokeStyle="white";
+  ctx.lineWidth=4;
 
-// borde cancha
-ctx.strokeRect(-W/2,-H/2,W,H);
+  ctx.strokeRect(-W/2,-H/2,W,H);
 
-// linea central
-ctx.beginPath();
-ctx.moveTo(0,-H/2);
-ctx.lineTo(0,H/2);
-ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(0,-H/2);
+  ctx.lineTo(0,H/2);
+  ctx.stroke();
 
-// circulo central
-ctx.beginPath();
-ctx.arc(0,0,80,0,Math.PI*2);
-ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0,0,80,0,Math.PI*2);
+  ctx.stroke();
 
-// áreas
-ctx.beginPath();
-ctx.arc(-W/2,0,areaR,-Math.PI/2,Math.PI/2);
-ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(-W/2,0,areaR,-Math.PI/2,Math.PI/2);
+  ctx.stroke();
 
-ctx.beginPath();
-ctx.arc(W/2,0,areaR,Math.PI/2,-Math.PI/2);
-ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(W/2,0,areaR,Math.PI/2,-Math.PI/2);
+  ctx.stroke();
 
-// arcos
-ctx.strokeRect(-W/2-15,-goalH/2,15,goalH);
-ctx.strokeRect(W/2,-goalH/2,15,goalH);
+  ctx.strokeRect(-W/2-20,-goalH/2,20,goalH);
+  ctx.strokeRect(W/2,-goalH/2,20,goalH);
 
-// números tácticos
-ctx.font="30px Arial";
-ctx.fillStyle="rgba(255,255,255,0.35)";
-ctx.fillText("1",-W/4,-H/4);
-ctx.fillText("2",W/4,-H/4);
-ctx.fillText("3",-W/4,H/4);
-ctx.fillText("4",W/4,H/4);
+  ctx.fillStyle="rgba(255,255,255,0.35)";
+  ctx.font="28px Arial";
+  ctx.textAlign="center";
+  ctx.fillText("1",-250,-150);
+  ctx.fillText("2",250,-150);
+  ctx.fillText("3",-250,150);
+  ctx.fillText("4",250,150);
 }
 
-/* ================= PLAYERS ================= */
-function drawPlayer(p){
-ctx.save();
-ctx.translate(p.x,p.y);
-
-const color=p.team==="A"?"#2196f3":"#ff4d4d";
-
-ctx.beginPath();
-ctx.arc(0,-20,7,0,Math.PI*2);
-ctx.fillStyle="#f1c27d";
-ctx.fill();
-
-ctx.strokeStyle=p.role==="arquero"?"#ffc107":color;
-ctx.lineWidth=5;
-
-ctx.beginPath();
-ctx.moveTo(0,-13);
-ctx.lineTo(0,15);
-ctx.stroke();
-
-ctx.beginPath();
-ctx.moveTo(-10,0);
-ctx.lineTo(10,0);
-ctx.stroke();
-
-ctx.beginPath();
-ctx.moveTo(0,15);
-ctx.lineTo(-7,30);
-ctx.moveTo(0,15);
-ctx.lineTo(7,30);
-ctx.stroke();
-
-ctx.fillStyle="white";
-ctx.font="13px Arial";
-ctx.textAlign="center";
-ctx.fillText(p.name,0,45);
-
-ctx.restore();
+/* ================== OBJETOS ================== */
+function drawObjects(){
+  objects.forEach(o=>{
+    if(o.type==="player" || o.type==="goalie"){
+      ctx.fillStyle=o.color;
+      ctx.beginPath();
+      ctx.arc(o.x,o.y,12,0,Math.PI*2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(o.x,o.y-14,7,0,Math.PI*2);
+      ctx.fill();
+    }
+    if(o.type==="cone"){
+      ctx.fillStyle="orange";
+      ctx.beginPath();
+      ctx.moveTo(o.x,o.y);
+      ctx.lineTo(o.x-10,o.y+20);
+      ctx.lineTo(o.x+10,o.y+20);
+      ctx.fill();
+    }
+    if(o.type==="ball"){
+      ctx.fillStyle="white";
+      ctx.beginPath();
+      ctx.arc(o.x,o.y,6,0,Math.PI*2);
+      ctx.fill();
+    }
+  });
 }
 
-/* ================= CONES ================= */
-function drawCones(){
-cones.forEach(c=>{
-ctx.fillStyle="orange";
-ctx.beginPath();
-ctx.moveTo(c.x,c.y);
-ctx.lineTo(c.x-10,c.y+25);
-ctx.lineTo(c.x+10,c.y+25);
-ctx.closePath();
-ctx.fill();
-});
-}
-
-/* ================= BALLS ================= */
-function drawBalls(){
-balls.forEach(b=>{
-ctx.fillStyle="white";
-ctx.beginPath();
-ctx.arc(b.x,b.y,8,0,Math.PI*2);
-ctx.fill();
-});
-}
-
-/* ================= ARROWS ================= */
+/* ================== FLECHAS ================== */
 function drawArrows(){
-arrows.forEach(a=>{
-ctx.strokeStyle=(a===selectedArrow)?"red":(a.team==="A"?"cyan":"yellow");
-ctx.lineWidth=4;
-ctx.beginPath();
-ctx.moveTo(a.from.x,a.from.y);
-ctx.lineTo(a.to.x,a.to.y);
-ctx.stroke();
-
-const ang=Math.atan2(a.to.y-a.from.y,a.to.x-a.from.x);
-ctx.beginPath();
-ctx.moveTo(a.to.x,a.to.y);
-ctx.lineTo(a.to.x-15*Math.cos(ang-Math.PI/6),a.to.y-15*Math.sin(ang-Math.PI/6));
-ctx.lineTo(a.to.x-15*Math.cos(ang+Math.PI/6),a.to.y-15*Math.sin(ang+Math.PI/6));
-ctx.fillStyle=(a===selectedArrow)?"red":(a.team==="A"?"cyan":"yellow");
-ctx.fill();
-});
+  arrows.forEach(a=>{
+    ctx.strokeStyle=a===selectedArrow?"yellow":"red";
+    ctx.lineWidth=4;
+    ctx.beginPath();
+    ctx.moveTo(a.x1,a.y1);
+    ctx.lineTo(a.x2,a.y2);
+    ctx.stroke();
+  });
 }
 
-/* ================= RENDER ================= */
+function deleteArrow(){
+  if(selectedArrow){
+    arrows = arrows.filter(a=>a!==selectedArrow);
+    selectedArrow=null;
+  }
+}
+
+/* ================== RENDER ================== */
 function render(){
-ctx.save();
-ctx.clearRect(0,0,canvas.width,canvas.height);
-ctx.translate(canvas.width/2,canvas.height/2);
-ctx.scale(scale,scale);
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.translate(offsetX,offsetY);
+  ctx.scale(scale,scale);
 
-drawField();
-drawArrows();
-drawCones();
-drawBalls();
-players.forEach(drawPlayer);
-
-ctx.restore();
+  drawField();
+  drawArrows();
+  drawObjects();
 }
-
-/* ================= INTERACTION ================= */
-canvas.addEventListener("mousedown",e=>{
-const r=canvas.getBoundingClientRect();
-const x=(e.clientX-r.left-canvas.width/2)/scale;
-const y=(e.clientY-r.top-canvas.height/2)/scale;
-
-// seleccionar flecha
-selectedArrow=arrows.find(a=>{
-const dx=a.to.x-a.from.x;
-const dy=a.to.y-a.from.y;
-const len=Math.hypot(dx,dy);
-const dist=Math.abs(dy*x-dx*y+a.to.x*a.from.y-a.to.y*a.from.x)/len;
-return dist<8;
-});
-if(selectedArrow){render();return;}
-
-// arrastrar conos
-dragging=players.find(p=>Math.hypot(p.x-x,p.y-y)<25)
-|| cones.find(c=>Math.hypot(c.x-x,c.y-y)<20)
-|| balls.find(b=>Math.hypot(b.x-x,b.y-y)<20);
-
-if(mode==="arrow"){
-arrowFrom=players.find(p=>Math.hypot(p.x-x,p.y-y)<25);
-if(arrowFrom) arrowStart={x:arrowFrom.x,y:arrowFrom.y};
-}
-});
-
-canvas.addEventListener("mousemove",e=>{
-if(dragging){
-const r=canvas.getBoundingClientRect();
-dragging.x=(e.clientX-r.left-canvas.width/2)/scale;
-dragging.y=(e.clientY-r.top-canvas.height/2)/scale;
 render();
-}
-});
 
-canvas.addEventListener("mouseup",e=>{
-dragging=null;
-if(mode==="arrow" && arrowFrom){
-const r=canvas.getBoundingClientRect();
-const x=(e.clientX-r.left-canvas.width/2)/scale;
-const y=(e.clientY-r.top-canvas.height/2)/scale;
-arrows.push({playerId:arrowFrom.id,team:arrowFrom.team,from:arrowStart,to:{x,y}});
-arrowFrom=null;
-render();
-}
-});
+/* ================== EVENTOS ================== */
+canvas.onmousedown=e=>{
+  const p=worldPos(e.clientX,e.clientY);
 
-canvas.addEventListener("wheel",e=>{
-e.preventDefault();
-scale+=e.deltaY*-0.001;
-scale=Math.min(Math.max(scale,0.5),2);
-render();
-});
+  if(mode==="player"){
+    objects.push({type:"player",x:p.x,y:p.y,color:"blue"});
+  }
+  if(mode==="goalie"){
+    objects.push({type:"goalie",x:p.x,y:p.y,color:"lime"});
+  }
+  if(mode==="cone"){
+    objects.push({type:"cone",x:p.x,y:p.y});
+  }
+  if(mode==="ball"){
+    objects.push({type:"ball",x:p.x,y:p.y});
+  }
 
-/* ================= FUNCTIONS ================= */
-function deleteSelectedArrow(){
-if(!selectedArrow) return;
-arrows=arrows.filter(a=>a!==selectedArrow);
-selectedArrow=null;
-render();
+  if(mode==="arrow"){
+    arrowTemp={x1:p.x,y1:p.y,x2:p.x,y2:p.y};
+    arrows.push(arrowTemp);
+  }
+
+  objects.forEach(o=>{
+    if(Math.hypot(o.x-p.x,o.y-p.y)<15){
+      dragging=o;
+    }
+  });
+
+  arrows.forEach(a=>{
+    const d=Math.hypot(a.x1-p.x,a.y1-p.y);
+    if(d<10) selectedArrow=a;
+  });
+};
+
+canvas.onmousemove=e=>{
+  const p=worldPos(e.clientX,e.clientY);
+  if(dragging){
+    dragging.x=p.x;
+    dragging.y=p.y;
+  }
+  if(arrowTemp){
+    arrowTemp.x2=p.x;
+    arrowTemp.y2=p.y;
+  }
+};
+
+canvas.onmouseup=()=>{
+  dragging=null;
+  arrowTemp=null;
+};
+
+canvas.onwheel=e=>{
+  scale+=e.deltaY*-0.001;
+  scale=Math.min(Math.max(0.3,scale),3);
+};
+
+/* ================== ANIMACIÓN ================== */
+function animate(){
+  arrows.forEach(a=>{
+    let t=0;
+    const i=setInterval(()=>{
+      t+=0.02;
+      objects.forEach(o=>{
+        if(Math.hypot(o.x-a.x1,o.y-a.y1)<15){
+          o.x=a.x1+(a.x2-a.x1)*t;
+          o.y=a.y1+(a.y2-a.y1)*t;
+        }
+      });
+      if(t>=1) clearInterval(i);
+    },16);
+  });
 }
 
-function animatePlay(){
-arrows.forEach(a=>{
-const p=players.find(pl=>pl.id===a.playerId);
-if(!p) return;
-let t=0;
-function step(){
-t+=0.02;
-p.x=a.from.x+(a.to.x-a.from.x)*t;
-p.y=a.from.y+(a.to.y-a.from.y)*t;
-render();
-if(t<1) requestAnimationFrame(step);
-}
-step();
-});
-}
-
-function toggleTactic(){
-tacticMode=tacticMode==="ofensivo"?"defensivo":"ofensivo";
-players.forEach(p=>{
-if(tacticMode==="defensivo") p.y+=80;
-else p.y-=80;
-});
-render();
-}
-
+/* ================== GUARDADO ================== */
 function savePlay(){
-localStorage.setItem("futsalPro",JSON.stringify({players,arrows,cones,balls}));
-alert("Guardado");
+  localStorage.setItem("futsalPlay",JSON.stringify({objects,arrows}));
 }
 
 function loadPlay(){
-const d=JSON.parse(localStorage.getItem("futsalPro"));
-if(!d) return;
-players=d.players;
-arrows=d.arrows;
-cones=d.cones;
-balls=d.balls;
-render();
+  const d=JSON.parse(localStorage.getItem("futsalPlay"));
+  if(!d) return;
+  objects.length=0;
+  arrows.length=0;
+  d.objects.forEach(o=>objects.push(o));
+  d.arrows.forEach(a=>arrows.push(a));
 }
-
-function addPlayer(role){
-const name=prompt("Nombre");
-const team=prompt("Equipo A o B").toUpperCase();
-if(!name||!["A","B"].includes(team)) return;
-players.push({id:crypto.randomUUID(),x:0,y:0,name,role,team});
-render();
-}
-
-function addCone(){cones.push({x:0,y:0});render();}
-function addBall(){balls.push({x:0,y:0});render();}
-
-render();
 </script>
 </body>
 </html>
