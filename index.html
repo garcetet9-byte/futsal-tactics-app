@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Futsal Tactics Pro</title>
+<title>Pizarra Futsal Pro</title>
 
 <style>
 html,body{
@@ -58,7 +58,7 @@ canvas{
   <button onclick="setMode('cone',this)">+ Cono</button>
   <button onclick="setMode('ball',this)">⚽ Pelota</button>
   <button onclick="setMode('arrow',this)">➝ Flecha</button>
-  <button onclick="deleteArrow()">🗑 Flecha</button>
+  <button onclick="deleteSelected()">🗑 Borrar</button>
   <button onclick="toggleTactic()">🧠 Of/Def</button>
   <button onclick="animatePlay()">▶ Animar</button>
   <button onclick="saveState()">💾 Guardar</button>
@@ -81,26 +81,18 @@ resize();
 window.addEventListener("resize", resize);
 
 /* ===== ESTADO ===== */
-let mode = "select";
-let team = "A";
-let tactic = "offensive";
-
-let objects = [];
-let arrows = [];
-
-let dragging = null;
-let selectedArrow = null;
-let arrowStartObject = null;
+let mode="select", team="A", tactic="offensive";
+let objects=[], arrows=[];
+let dragging=null, selected=null, arrowStart=null;
 
 /* ===== MODOS ===== */
 function setMode(m,btn){
-  mode = m;
+  mode=m;
   document.querySelectorAll("#toolbar button").forEach(b=>b.classList.remove("active"));
   if(btn) btn.classList.add("active");
 }
-
 function setTeam(t,btn){
-  team = t;
+  team=t;
   document.querySelectorAll("#toolbar button").forEach(b=>{
     if(b.textContent.includes("Equipo")) b.classList.remove("active");
   });
@@ -112,9 +104,8 @@ function drawField(){
   ctx.fillStyle="#166534";
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  ctx.strokeStyle="white";
+  ctx.strokeStyle="#fff";
   ctx.lineWidth=3;
-
   ctx.strokeRect(100,50,canvas.width-200,canvas.height-100);
 
   ctx.beginPath();
@@ -130,71 +121,95 @@ function drawField(){
   ctx.strokeRect(canvas.width-100,canvas.height/2-100,20,200);
 }
 
-/* ===== PERSONITA ===== */
+/* ===== JUGADOR REALISTA ===== */
 function drawPlayer(o){
-  // Cabeza
+  ctx.strokeStyle=o.color;
   ctx.fillStyle=o.color;
+  ctx.lineWidth=3;
+
+  // Cabeza
   ctx.beginPath();
-  ctx.arc(o.x,o.y-8,6,0,Math.PI*2);
+  ctx.arc(o.x,o.y-12,7,0,Math.PI*2);
   ctx.fill();
 
-  // Cuerpo
-  ctx.strokeStyle=o.color;
-  ctx.lineWidth=3;
+  // Torso
   ctx.beginPath();
-  ctx.moveTo(o.x,o.y-2);
-  ctx.lineTo(o.x,o.y+12);
+  ctx.moveTo(o.x,o.y-4);
+  ctx.lineTo(o.x,o.y+14);
+  ctx.stroke();
+
+  // Brazos
+  ctx.beginPath();
+  ctx.moveTo(o.x,o.y+2);
+  ctx.lineTo(o.x-8,o.y+10);
+  ctx.moveTo(o.x,o.y+2);
+  ctx.lineTo(o.x+8,o.y+10);
   ctx.stroke();
 
   // Piernas
   ctx.beginPath();
-  ctx.moveTo(o.x,o.y+12);
-  ctx.lineTo(o.x-6,o.y+22);
-  ctx.moveTo(o.x,o.y+12);
-  ctx.lineTo(o.x+6,o.y+22);
+  ctx.moveTo(o.x,o.y+14);
+  ctx.lineTo(o.x-6,o.y+26);
+  ctx.moveTo(o.x,o.y+14);
+  ctx.lineTo(o.x+6,o.y+26);
   ctx.stroke();
+
+  // Arquero
+  if(o.type==="goalie"){
+    ctx.strokeStyle="yellow";
+    ctx.lineWidth=2;
+    ctx.strokeRect(o.x-16,o.y-22,32,50);
+  }
 
   // Nombre
   ctx.fillStyle="white";
   ctx.font="12px Arial";
   ctx.textAlign="center";
-  ctx.fillText(o.name,o.x,o.y+36);
+  ctx.fillText(o.name,o.x,o.y+40);
+}
 
-  // Arquero distinto
-  if(o.type==="goalie"){
-    ctx.strokeStyle="yellow";
-    ctx.lineWidth=2;
-    ctx.strokeRect(o.x-14,o.y-20,28,40);
-  }
+/* ===== PELOTA REALISTA ===== */
+function drawBall(o){
+  ctx.fillStyle="white";
+  ctx.beginPath();
+  ctx.arc(o.x,o.y,7,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.strokeStyle="#000";
+  ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.arc(o.x,o.y,7,0,Math.PI*2);
+  ctx.stroke();
+
+  // costuras
+  ctx.beginPath();
+  ctx.moveTo(o.x-4,o.y);
+  ctx.lineTo(o.x+4,o.y);
+  ctx.moveTo(o.x,o.y-4);
+  ctx.lineTo(o.x,o.y+4);
+  ctx.stroke();
 }
 
 /* ===== OBJETOS ===== */
 function drawObjects(){
   objects.forEach(o=>{
     if(o.type==="player"||o.type==="goalie") drawPlayer(o);
-
     if(o.type==="cone"){
       ctx.fillStyle="orange";
       ctx.beginPath();
       ctx.moveTo(o.x,o.y);
-      ctx.lineTo(o.x-10,o.y+20);
-      ctx.lineTo(o.x+10,o.y+20);
+      ctx.lineTo(o.x-10,o.y+22);
+      ctx.lineTo(o.x+10,o.y+22);
       ctx.fill();
     }
-
-    if(o.type==="ball"){
-      ctx.fillStyle="white";
-      ctx.beginPath();
-      ctx.arc(o.x,o.y,6,0,Math.PI*2);
-      ctx.fill();
-    }
+    if(o.type==="ball") drawBall(o);
   });
 }
 
 /* ===== FLECHAS ===== */
 function drawArrows(){
   arrows.forEach(a=>{
-    ctx.strokeStyle = a===selectedArrow ? "yellow" : (tactic==="offensive"?"red":"blue");
+    ctx.strokeStyle=a===selected?"yellow":(tactic==="offensive"?"red":"blue");
     ctx.lineWidth=4;
     ctx.beginPath();
     ctx.moveTo(a.from.x,a.from.y);
@@ -214,26 +229,24 @@ function render(){
 render();
 
 /* ===== EVENTOS ===== */
-canvas.addEventListener("mousedown", e=>{
-  const x=e.offsetX, y=e.offsetY;
-  dragging=null;
-  selectedArrow=null;
+canvas.addEventListener("mousedown",e=>{
+  const x=e.offsetX,y=e.offsetY;
+  dragging=null; selected=null;
 
   if(mode==="player"||mode==="goalie"){
-    const name = prompt("Nombre:");
+    const name=prompt("Nombre:");
     if(!name) return;
-    const color = team==="A"?"#2563eb":"#dc2626";
+    const color=team==="A"?"#2563eb":"#dc2626";
     objects.push({type:mode,x,y,name,color});
     return;
   }
-
-  if(mode==="cone"){ objects.push({type:"cone",x,y}); return; }
-  if(mode==="ball"){ objects.push({type:"ball",x,y}); return; }
+  if(mode==="cone"){objects.push({type:"cone",x,y});return;}
+  if(mode==="ball"){objects.push({type:"ball",x,y});return;}
 
   if(mode==="arrow"){
     objects.forEach(o=>{
       if(Math.hypot(o.x-x,o.y-y)<20){
-        arrowStartObject=o;
+        arrowStart=o;
         arrows.push({from:o,to:{x,y}});
       }
     });
@@ -241,69 +254,57 @@ canvas.addEventListener("mousedown", e=>{
   }
 
   objects.forEach(o=>{
-    if(Math.hypot(o.x-x,o.y-y)<20) dragging=o;
+    if(Math.hypot(o.x-x,o.y-y)<20) dragging=o,selected=o;
   });
 
   arrows.forEach(a=>{
-    if(Math.hypot(a.to.x-x,a.to.y-y)<10) selectedArrow=a;
+    if(Math.hypot(a.to.x-x,a.to.y-y)<10) selected=a;
   });
 });
 
-canvas.addEventListener("mousemove", e=>{
-  const x=e.offsetX, y=e.offsetY;
-  if(dragging){ dragging.x=x; dragging.y=y; }
-  if(arrowStartObject){
-    arrows[arrows.length-1].to={x,y};
-  }
+canvas.addEventListener("mousemove",e=>{
+  const x=e.offsetX,y=e.offsetY;
+  if(dragging){dragging.x=x;dragging.y=y;}
+  if(arrowStart){arrows[arrows.length-1].to={x,y};}
 });
 
-canvas.addEventListener("mouseup",()=>{
-  dragging=null;
-  arrowStartObject=null;
-});
+canvas.addEventListener("mouseup",()=>{dragging=null;arrowStart=null;});
 
-/* DOBLE CLICK → EDITAR NOMBRE */
-canvas.addEventListener("dblclick", e=>{
-  const x=e.offsetX, y=e.offsetY;
+/* DOBLE CLICK EDITA NOMBRE */
+canvas.addEventListener("dblclick",e=>{
+  const x=e.offsetX,y=e.offsetY;
   objects.forEach(o=>{
-    if((o.type==="player"||o.type==="goalie") &&
-       Math.hypot(o.x-x,o.y-y)<20){
-      const n = prompt("Editar nombre:", o.name);
+    if((o.type==="player"||o.type==="goalie") && Math.hypot(o.x-x,o.y-y)<20){
+      const n=prompt("Editar nombre:",o.name);
       if(n) o.name=n;
     }
   });
 });
 
+/* ===== BORRAR ===== */
+function deleteSelected(){
+  if(!selected) return;
+  objects=objects.filter(o=>o!==selected);
+  arrows=arrows.filter(a=>a!==selected);
+  selected=null;
+}
+
 /* ===== ACCIONES ===== */
-function deleteArrow(){
-  if(selectedArrow){
-    arrows = arrows.filter(a=>a!==selectedArrow);
-    selectedArrow=null;
-  }
-}
-
-function toggleTactic(){
-  tactic = tactic==="offensive"?"defensive":"offensive";
-}
-
+function toggleTactic(){tactic=tactic==="offensive"?"defensive":"offensive";}
 function animatePlay(){
   arrows.forEach(a=>{
-    const o=a.from, t=a.to;
+    const o=a.from,t=a.to;
     const i=setInterval(()=>{
-      o.x += (t.x-o.x)*0.1;
-      o.y += (t.y-o.y)*0.1;
+      o.x+=(t.x-o.x)*0.1;
+      o.y+=(t.y-o.y)*0.1;
       if(Math.hypot(o.x-t.x,o.y-t.y)<1) clearInterval(i);
     },16);
   });
 }
-
-function saveState(){
-  localStorage.setItem("futsalPro",JSON.stringify({objects,arrows}));
-}
-
+function saveState(){localStorage.setItem("futsalPro",JSON.stringify({objects,arrows}));}
 function loadState(){
   const d=JSON.parse(localStorage.getItem("futsalPro"));
-  if(d){ objects=d.objects; arrows=d.arrows; }
+  if(d){objects=d.objects;arrows=d.arrows;}
 }
 </script>
 
