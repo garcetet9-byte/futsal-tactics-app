@@ -2,15 +2,15 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Pizarra Futsal Pro</title>
+<title>Futsal Tactics Pro</title>
 
 <style>
 html,body{
   margin:0;
   padding:0;
   overflow:hidden;
-  font-family:Arial, Helvetica, sans-serif;
   background:#0f172a;
+  font-family:Arial, Helvetica, sans-serif;
 }
 
 #toolbar{
@@ -28,7 +28,7 @@ html,body{
 }
 
 #toolbar button{
-  background:#f3f4f6;
+  background:#e5e7eb;
   border:none;
   border-radius:6px;
   padding:6px 10px;
@@ -52,19 +52,19 @@ canvas{
 <body>
 
 <div id="toolbar">
-  <button onclick="setMode('select', this)">Seleccionar</button>
-  <button onclick="setMode('player', this)">+ Jugador</button>
-  <button onclick="setMode('goalie', this)">+ Arquero</button>
-  <button onclick="setMode('cone', this)">+ Cono</button>
-  <button onclick="setMode('ball', this)">⚽ Pelota</button>
-  <button onclick="setMode('arrow', this)">➝ Flecha</button>
+  <button onclick="setMode('select',this)">Seleccionar</button>
+  <button onclick="setMode('player',this)">+ Jugador</button>
+  <button onclick="setMode('goalie',this)">+ Arquero</button>
+  <button onclick="setMode('cone',this)">+ Cono</button>
+  <button onclick="setMode('ball',this)">⚽ Pelota</button>
+  <button onclick="setMode('arrow',this)">➝ Flecha</button>
   <button onclick="deleteArrow()">🗑 Flecha</button>
   <button onclick="toggleTactic()">🧠 Of/Def</button>
   <button onclick="animatePlay()">▶ Animar</button>
   <button onclick="saveState()">💾 Guardar</button>
   <button onclick="loadState()">📂 Cargar</button>
-  <button onclick="setTeam('A', this)">Equipo A</button>
-  <button onclick="setTeam('B', this)">Equipo B</button>
+  <button onclick="setTeam('A',this)">Equipo A</button>
+  <button onclick="setTeam('B',this)">Equipo B</button>
 </div>
 
 <canvas id="canvas"></canvas>
@@ -80,7 +80,7 @@ function resize(){
 resize();
 window.addEventListener("resize", resize);
 
-/* ======= ESTADO ======= */
+/* ===== ESTADO ===== */
 let mode = "select";
 let team = "A";
 let tactic = "offensive";
@@ -92,14 +92,14 @@ let dragging = null;
 let selectedArrow = null;
 let arrowStartObject = null;
 
-/* ======= MODOS ======= */
-function setMode(m, btn){
+/* ===== MODOS ===== */
+function setMode(m,btn){
   mode = m;
   document.querySelectorAll("#toolbar button").forEach(b=>b.classList.remove("active"));
   if(btn) btn.classList.add("active");
 }
 
-function setTeam(t, btn){
+function setTeam(t,btn){
   team = t;
   document.querySelectorAll("#toolbar button").forEach(b=>{
     if(b.textContent.includes("Equipo")) b.classList.remove("active");
@@ -107,12 +107,12 @@ function setTeam(t, btn){
   if(btn) btn.classList.add("active");
 }
 
-/* ======= DIBUJAR CANCHA ======= */
+/* ===== CANCHA ===== */
 function drawField(){
   ctx.fillStyle="#166534";
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  ctx.strokeStyle="#ffffff";
+  ctx.strokeStyle="white";
   ctx.lineWidth=3;
 
   ctx.strokeRect(100,50,canvas.width-200,canvas.height-100);
@@ -130,26 +130,48 @@ function drawField(){
   ctx.strokeRect(canvas.width-100,canvas.height/2-100,20,200);
 }
 
-/* ======= DIBUJAR OBJETOS ======= */
+/* ===== PERSONITA ===== */
+function drawPlayer(o){
+  // Cabeza
+  ctx.fillStyle=o.color;
+  ctx.beginPath();
+  ctx.arc(o.x,o.y-8,6,0,Math.PI*2);
+  ctx.fill();
+
+  // Cuerpo
+  ctx.strokeStyle=o.color;
+  ctx.lineWidth=3;
+  ctx.beginPath();
+  ctx.moveTo(o.x,o.y-2);
+  ctx.lineTo(o.x,o.y+12);
+  ctx.stroke();
+
+  // Piernas
+  ctx.beginPath();
+  ctx.moveTo(o.x,o.y+12);
+  ctx.lineTo(o.x-6,o.y+22);
+  ctx.moveTo(o.x,o.y+12);
+  ctx.lineTo(o.x+6,o.y+22);
+  ctx.stroke();
+
+  // Nombre
+  ctx.fillStyle="white";
+  ctx.font="12px Arial";
+  ctx.textAlign="center";
+  ctx.fillText(o.name,o.x,o.y+36);
+
+  // Arquero distinto
+  if(o.type==="goalie"){
+    ctx.strokeStyle="yellow";
+    ctx.lineWidth=2;
+    ctx.strokeRect(o.x-14,o.y-20,28,40);
+  }
+}
+
+/* ===== OBJETOS ===== */
 function drawObjects(){
   objects.forEach(o=>{
-    if(o.type==="player"||o.type==="goalie"){
-      ctx.fillStyle=o.color;
-      ctx.beginPath();
-      ctx.arc(o.x,o.y,14,0,Math.PI*2);
-      ctx.fill();
-
-      ctx.fillStyle="white";
-      ctx.font="12px Arial";
-      ctx.textAlign="center";
-      ctx.fillText(o.name,o.x,o.y+30);
-
-      if(o.type==="goalie"){
-        ctx.strokeStyle="yellow";
-        ctx.lineWidth=2;
-        ctx.strokeRect(o.x-20,o.y-20,40,40);
-      }
-    }
+    if(o.type==="player"||o.type==="goalie") drawPlayer(o);
 
     if(o.type==="cone"){
       ctx.fillStyle="orange";
@@ -169,7 +191,7 @@ function drawObjects(){
   });
 }
 
-/* ======= FLECHAS ======= */
+/* ===== FLECHAS ===== */
 function drawArrows(){
   arrows.forEach(a=>{
     ctx.strokeStyle = a===selectedArrow ? "yellow" : (tactic==="offensive"?"red":"blue");
@@ -181,7 +203,7 @@ function drawArrows(){
   });
 }
 
-/* ======= RENDER ======= */
+/* ===== RENDER ===== */
 function render(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   drawField();
@@ -191,19 +213,16 @@ function render(){
 }
 render();
 
-/* ======= EVENTOS ======= */
+/* ===== EVENTOS ===== */
 canvas.addEventListener("mousedown", e=>{
-  const x = e.offsetX;
-  const y = e.offsetY;
+  const x=e.offsetX, y=e.offsetY;
+  dragging=null;
+  selectedArrow=null;
 
-  dragging = null;
-  selectedArrow = null;
-
-  if(mode==="player" || mode==="goalie"){
-    const name = prompt("Nombre del jugador:");
+  if(mode==="player"||mode==="goalie"){
+    const name = prompt("Nombre:");
     if(!name) return;
-
-    const color = team==="A" ? "#2563eb" : "#dc2626";
+    const color = team==="A"?"#2563eb":"#dc2626";
     objects.push({type:mode,x,y,name,color});
     return;
   }
@@ -213,15 +232,16 @@ canvas.addEventListener("mousedown", e=>{
 
   if(mode==="arrow"){
     objects.forEach(o=>{
-      if(Math.hypot(o.x-x,o.y-y)<15){
+      if(Math.hypot(o.x-x,o.y-y)<20){
         arrowStartObject=o;
         arrows.push({from:o,to:{x,y}});
       }
     });
+    return;
   }
 
   objects.forEach(o=>{
-    if(Math.hypot(o.x-x,o.y-y)<15) dragging=o;
+    if(Math.hypot(o.x-x,o.y-y)<20) dragging=o;
   });
 
   arrows.forEach(a=>{
@@ -230,25 +250,31 @@ canvas.addEventListener("mousedown", e=>{
 });
 
 canvas.addEventListener("mousemove", e=>{
-  const x=e.offsetX;
-  const y=e.offsetY;
-
-  if(dragging){
-    dragging.x=x;
-    dragging.y=y;
-  }
-
-  if(mode==="arrow" && arrowStartObject){
-    arrows[arrows.length-1].to = {x,y};
+  const x=e.offsetX, y=e.offsetY;
+  if(dragging){ dragging.x=x; dragging.y=y; }
+  if(arrowStartObject){
+    arrows[arrows.length-1].to={x,y};
   }
 });
 
-canvas.addEventListener("mouseup", ()=>{
+canvas.addEventListener("mouseup",()=>{
   dragging=null;
   arrowStartObject=null;
 });
 
-/* ======= ACCIONES ======= */
+/* DOBLE CLICK → EDITAR NOMBRE */
+canvas.addEventListener("dblclick", e=>{
+  const x=e.offsetX, y=e.offsetY;
+  objects.forEach(o=>{
+    if((o.type==="player"||o.type==="goalie") &&
+       Math.hypot(o.x-x,o.y-y)<20){
+      const n = prompt("Editar nombre:", o.name);
+      if(n) o.name=n;
+    }
+  });
+});
+
+/* ===== ACCIONES ===== */
 function deleteArrow(){
   if(selectedArrow){
     arrows = arrows.filter(a=>a!==selectedArrow);
@@ -262,27 +288,22 @@ function toggleTactic(){
 
 function animatePlay(){
   arrows.forEach(a=>{
-    const obj=a.from;
-    const target=a.to;
-    const interval=setInterval(()=>{
-      obj.x += (target.x-obj.x)*0.1;
-      obj.y += (target.y-obj.y)*0.1;
-      if(Math.hypot(obj.x-target.x,obj.y-target.y)<1){
-        clearInterval(interval);
-      }
+    const o=a.from, t=a.to;
+    const i=setInterval(()=>{
+      o.x += (t.x-o.x)*0.1;
+      o.y += (t.y-o.y)*0.1;
+      if(Math.hypot(o.x-t.x,o.y-t.y)<1) clearInterval(i);
     },16);
   });
 }
 
 function saveState(){
-  localStorage.setItem("futsalPro", JSON.stringify({objects,arrows}));
+  localStorage.setItem("futsalPro",JSON.stringify({objects,arrows}));
 }
 
 function loadState(){
-  const data = JSON.parse(localStorage.getItem("futsalPro"));
-  if(!data) return;
-  objects=data.objects;
-  arrows=data.arrows;
+  const d=JSON.parse(localStorage.getItem("futsalPro"));
+  if(d){ objects=d.objects; arrows=d.arrows; }
 }
 </script>
 
